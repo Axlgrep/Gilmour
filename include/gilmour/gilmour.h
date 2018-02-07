@@ -7,5 +7,6 @@
 #define INCLUDE_GILMOUR_H
 
 #include <string>
+#include <iostream>
 
 #endif // INCLUDE_GILMOUR_H

@@ -3,3 +3,9 @@ gilmour
 
 # Compile redirection file
 src/*.o
+
+# CTAGS
+tags
+
+#db dir
+/db

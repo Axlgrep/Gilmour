@@ -5,5 +5,29 @@
 
 #include "gilmour/gilmour.h"
 
+#include "leveldb/db.h"
+
 int main() {
+  leveldb::DB* db;
+  leveldb::Options options;
+  options.create_if_missing = true;
+
+  std::string path = "./db";
+  leveldb::Status s = leveldb::DB::Open(options, path, &db);
+
+  std::string key = "key";
+  std::string value = "value";
+  s = db->Put(leveldb::WriteOptions(), key, value);
+  assert(s.ok());
+
+  value.clear();
+  s = db->Get(leveldb::ReadOptions(), key, &value);
+  assert(s.ok());
+  std::cout << key << " : " << value << std::endl;
+
+  s = db->Delete(leveldb::WriteOptions(), key);
+  assert(s.ok());
+
+  delete db;
+  return 0;
 }

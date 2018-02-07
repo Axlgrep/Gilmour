@@ -1,20 +1,22 @@
-CXX = g++
-CXXFLAGS = -std=c++11
-TARGET = gilmour
+CXX=g++
+LDFLAGS=-lpthread -lsnappy
+CXXFLAGS=-std=c++11
+TARGET=gilmour
 
-SRC_DIR = ./src
-THIRD_PATH = $(CURDIR)/third
+SRC_DIR=./src
+THIRD_PATH=./third
 
 ifndef LEVELDB_PATH
-LEVELDB_PATH = $(THIRD_PATH)/leveldb
+LEVELDB_PATH=$(THIRD_PATH)/leveldb
 endif
-LEVELDB = $(LEVELDB_PATH)/out-static/libleveldb.a
+LEVELDB=$(LEVELDB_PATH)/out-static/libleveldb.a
 
-INCLUDE_PATH = -I./include
+INCLUDE_PATH = -I./include               \
+               -I$(LEVELDB_PATH)/include \
 
-LIB_PATH = -L$(LEVELDB_PATH)/out-static/
+LIB_PATH = -L$(LEVELDB_PATH)/out-static/ \
 
-LIBS = -lleveldb
+LIBS = -lleveldb                         \
 
 SOURCE := $(wildcard $(SRC_DIR)/*.cc)
 OBJS := $(patsubst %.cc, %.o, $(SOURCE))
@@ -23,8 +25,12 @@ default: all
 
 all: $(TARGET)
 
+# 这里的$(OBJS)不能放在最后，CSAPP中说过
+# 链接器维持了一个可重定位目标文件的集合
+# E, 一个未解析的符号集合U,以及一个在前面
+# 输入文件中已经定义的符号集合D...
 $(TARGET): $(LEVELDB) $(OBJS)
-	$(CXX) $(CXXFLAGS) -o $@ $(LEVELDB) $(OBJS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $(OBJS) $(INCLUDE_PATH) $(LIB_PATH) $(LIBS)
 
 $(LEVELDB):
 	make -C $(LEVELDB_PATH)
