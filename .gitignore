@@ -1,2 +1,5 @@
 # Executables
-*.out
+gilmour
+
+# Compile redirection file
+src/*.o
