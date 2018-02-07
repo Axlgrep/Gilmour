@@ -1,0 +1,3 @@
+[submodule "third/leveldb"]
+	path = third/leveldb
+	url = https://github.com/google/leveldb.git
