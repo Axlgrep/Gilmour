@@ -1,3 +1,12 @@
 [submodule "third/leveldb"]
 	path = third/leveldb
 	url = https://github.com/Axlgrep/leveldb.git
+[submodule "third/blackwidow"]
+	path = third/blackwidow
+	url = https://github.com/KernelMaker/blackwidow.git
+[submodule "third/nemo"]
+	path = third/nemo
+	url = https://github.com/Qihoo360/nemo.git
+[submodule "third/rocksdb"]
+	path = third/rocksdb
+	url = https://github.com/facebook/rocksdb.git
