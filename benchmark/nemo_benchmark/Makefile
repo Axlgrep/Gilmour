@@ -51,9 +51,11 @@ benchmark: benchmark.cc
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(INCLUDE_PATH) $(LIB_PATH) $(LDFLAGS) $(LIBS)
 
 clean:
+	rm -rf db
 	rm -rf benchmark
 
 distclean:
+	rm -rf db
 	rm -rf benchmark
 	make -C $(NEMO_PATH) clean
 	make -C $(NEMOROCKSDB_PATH) clean

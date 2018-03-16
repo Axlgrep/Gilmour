@@ -40,9 +40,11 @@ benchmark: benchmark.cc
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(INCLUDE_PATH) $(LIB_PATH) $(LDFLAGS) $(LIBS)
 
 clean:
+	rm -rf db
 	rm -rf benchmark
 
 distclean:
+	rm -rf db
 	rm -rf benchmark
 	make -C $(BLACKWIDOW_PATH) clean
 	make -C $(ROCKSDB_PATH) clean
