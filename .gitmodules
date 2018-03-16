@@ -1,12 +1,18 @@
 [submodule "third/leveldb"]
 	path = third/leveldb
 	url = https://github.com/Axlgrep/leveldb.git
-[submodule "third/blackwidow"]
-	path = third/blackwidow
-	url = https://github.com/KernelMaker/blackwidow.git
-[submodule "third/nemo"]
-	path = third/nemo
+[submodule "benchmark/nemo_benchmark/deps/nemo"]
+	path = benchmark/nemo_benchmark/deps/nemo
 	url = https://github.com/Qihoo360/nemo.git
-[submodule "third/rocksdb"]
-	path = third/rocksdb
+[submodule "benchmark/blackwidow_benchmark/deps/blackwidow"]
+	path = benchmark/blackwidow_benchmark/deps/blackwidow
+	url = https://github.com/KernelMaker/blackwidow.git
+[submodule "benchmark/blackwidow_benchmark/deps/rocksdb"]
+	path = benchmark/blackwidow_benchmark/deps/rocksdb
 	url = https://github.com/facebook/rocksdb.git
+[submodule "benchmark/nemo_benchmark/deps/rocksdb"]
+	path = benchmark/nemo_benchmark/deps/rocksdb
+	url = https://github.com/facebook/rocksdb.git
+[submodule "benchmark/nemo_benchmark/deps/nemo-rocksdb"]
+	path = benchmark/nemo_benchmark/deps/nemo-rocksdb
+	url = https://github.com/Qihoo360/nemo-rocksdb.git

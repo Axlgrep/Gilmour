@@ -14,4 +14,10 @@ using namespace blackwidow;
 using namespace std::chrono;
 
 int main() {
+  blackwidow::Options options;
+  blackwidow::BlackWidow db;
+  blackwidow::Status s;
+
+  options.create_if_missing = true;
+  s = db.Open(options, "./db");
 }

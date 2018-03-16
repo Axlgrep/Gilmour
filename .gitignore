@@ -10,6 +10,10 @@ tags
 #db dir
 /db
 
-#benchmark
-benchmark/db
-benchmark/engine_benchmark
+#nemo benchmark
+benchmark/nemo_benchmark/db/
+benchmark/nemo_benchmark/benchmark
+
+#blackwidow benchmark
+benchmark/blackwidow_benchmark/db/
+benchmark/blackwidow_benchmark/benchmark
