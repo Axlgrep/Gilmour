@@ -10,6 +10,8 @@
 
 #include "blackwidow/blackwidow.h"
 
+const int TEN_THOUSAND = 10000;
+const int ONE_HUNDRED_THOUSAND = 100000;
 const int TEN_MILLION = 10000000;
 
 using namespace blackwidow;
@@ -36,7 +38,7 @@ void BenchSet() {
     values.push_back("VALUE_" + std::to_string(i));
   }
 
-  auto start = std::chrono::system_clock::now();
+  auto start = system_clock::now();
   for (uint32_t i = 0; i < TEN_MILLION; ++i) {
     db.Set(keys[i], values[i]);
   }
@@ -48,10 +50,11 @@ void BenchSet() {
 }
 
 // Blackwidow performance more stronger
-// bw 31421ms | nm 192984ms
+// bw 156507ms | nm 198454ms
 //
-// 因为blackwidow内可以支持多个Field一次删除, 而nemo只能
-// 单个单个Field删除，期间每次操作都要上锁解锁, 所以比较慢
+// 单个删除Hash表中的Field测试中, Blackwidow比nemo性能要快，
+// 并且Blackwidow还支持一次删除多个Field, 这样相比较于单个
+// 删除, 速度还要更加快.
 void BenchHDel() {
   printf("====== HDel ======\n");
   blackwidow::Options options;
@@ -79,21 +82,23 @@ void BenchHDel() {
   db.HMSet("HDEL_KEY", fvs);
 
   auto start = system_clock::now();
-  db.HDel("HDEL_KEY", fields, &ret);
+  for (const auto& field : fields) {
+    db.HDel("HDEL_KEY", {field}, &ret);
+  }
   auto end = system_clock::now();
   duration<double> elapsed_seconds = end - start;
   auto cost = duration_cast<milliseconds>(elapsed_seconds).count();
-  std::cout << "HDel " << fvs.size()
+  std::cout << "Test HDel " << fvs.size()
     << " Hash Field Cost: "<< cost << "ms" << std::endl;
 }
 
 // Case 1
 // Performance is equal
-// bw 4ms | nm 5ms
+// bw 30ms | nm 51ms
 //
 // Case 2
 // Blackwidow performance more stronger
-// bw 2ms | nm 3540ms
+// bw 31ms | nm 3531ms
 // blackwidow把Version放到了Hash键当中, 当我们删除一个Hash表然后创建同名Hash表,
 // version会变化, 我们可以快速的Seek到rockdb中当前Hash表的数据.
 // nemo将Version放到Hash值当中, 上面这种情况会遍历新Hash表旧Hash表所有的Field,
@@ -101,7 +106,7 @@ void BenchHDel() {
 //
 // Case 3
 // Nemo performance more stronger
-// bw 3000ms | nm 600ms
+// bw 4539ms | nm 659ms
 // 原因待查
 void BenchHGetall() {
   printf("====== HGetall ======\n");
@@ -121,10 +126,10 @@ void BenchHGetall() {
   std::vector<BlackWidow::FieldValue> fvs_in;
   std::vector<BlackWidow::FieldValue> fvs_out;
 
-  // 1. Create the hash table then insert hash table 10000 field
-  // 2. HGetall the hash table 10000 field (statistics cost time)
+  // 1. Create the hash table then insert hash table 100000 field
+  // 2. HGetall the hash table 100000 field (statistics cost time)
   fvs_in.clear();
-  for (size_t i = 0; i < 10000; ++i) {
+  for (size_t i = 0; i < ONE_HUNDRED_THOUSAND; ++i) {
     fv.field = "FIELD_" + std::to_string(i);
     fv.value = "VALUE_" + std::to_string(i);
     fvs_in.push_back(fv);
@@ -145,8 +150,8 @@ void BenchHGetall() {
   // 1. Create the hash table then insert hash table 10000000 field
   // 2. Delete the hash table
   // 3. Create the hash table whos key same as before,
-  //    then insert the hash table 10000 field
-  // 4. HGetall the hash table 10000 field (statistics cost time)
+  //    then insert the hash table 100000 field
+  // 4. HGetall the hash table 100000 field (statistics cost time)
   fvs_in.clear();
   for (size_t i = 0; i < TEN_MILLION; ++i) {
     fv.field = "FIELD_" + std::to_string(i);
@@ -158,7 +163,7 @@ void BenchHGetall() {
   std::map<BlackWidow::DataType, Status> type_status;
   db.Del(del_keys, &type_status);
   fvs_in.clear();
-  for (size_t i = 0; i < 10000; ++i) {
+  for (size_t i = 0; i < ONE_HUNDRED_THOUSAND; ++i) {
     fv.field = "FIELD_" + std::to_string(i);
     fv.value = "VALUE_" + std::to_string(i);
     fvs_in.push_back(fv);
@@ -185,7 +190,7 @@ void BenchHGetall() {
   }
   db.HMSet("HGETALL_KEY3", fvs_in);
   fields.clear();
-  for (size_t i = 0; i < TEN_MILLION - 10000; ++i) {
+  for (size_t i = 0; i < TEN_MILLION - ONE_HUNDRED_THOUSAND; ++i) {
     fields.push_back("FIELD_" + std::to_string(i));
   }
   db.HDel("HGETALL_KEY3", fields, &ret);
@@ -200,11 +205,141 @@ void BenchHGetall() {
     << " Field HashTable Cost: "<< cost << "ms" << std::endl;
 }
 
+// Blackwidow performance more stronger
+// bw 388640ms | nm 165896ms
+//
+// 因为blackwidow内的SAdd可以支持一次添加多个member, 而nemo
+// 一次SAdd操作只能想集合中添加一个member，期间每次操作都要
+// 上锁解锁, 所以比较慢
+void BenchSAdd() {
+  printf("====== SAdd ======\n");
+  blackwidow::Options options;
+  options.create_if_missing = true;
+  blackwidow::BlackWidow db;
+  blackwidow::Status s = db.Open(options, "./db");
+
+  if (!s.ok()) {
+    printf("Open db failed, error: %s\n", s.ToString().c_str());
+    return;
+  }
+
+  int32_t ret;
+  std::vector<std::string> members_in;
+  for (int i = 0; i < TEN_MILLION; i++) {
+    members_in.push_back("MEMBER_" + std::to_string(i));
+  }
+
+  auto start = system_clock::now();
+  for (const auto& member : members_in) {
+    db.SAdd("SADD_KEY", {member}, &ret);
+  }
+  auto end = system_clock::now();
+  duration<double> elapsed_seconds = end - start;
+  auto cost = duration_cast<milliseconds>(elapsed_seconds).count();
+  std::cout << "Test SAdd " << TEN_MILLION << " Cost: " << cost << "ms" << std::endl;
+}
+
+void BenchSPop() {
+  printf("====== SPop ======\n");
+  blackwidow::Options options;
+  options.create_if_missing = true;
+  blackwidow::BlackWidow db;
+  blackwidow::Status s = db.Open(options, "./db");
+
+  if (!s.ok()) {
+    printf("Open db failed, error: %s\n", s.ToString().c_str());
+    return;
+  }
+
+  int32_t ret;
+  std::vector<std::string> members_in;
+  std::vector<std::string> members_out;
+  for (int i = 0; i < TEN_MILLION; i++) {
+    members_in.push_back("MEMBER_" + std::to_string(i));
+  }
+  db.SAdd("SPOP_KEY", members_in, &ret);
+
+  auto start = system_clock::now();
+  for (uint32_t i = 0; i < ONE_HUNDRED_THOUSAND; ++i) {
+    db.SPop("SPOP_KEY", i, &members_out);
+  }
+  auto end = system_clock::now();
+  duration<double> elapsed_seconds = end - start;
+  auto cost = duration_cast<milliseconds>(elapsed_seconds).count();
+  std::cout << "Test SPop " << TEN_THOUSAND << " Cost: " << cost << "ms" << std::endl;
+}
+
+// Case 1
+// Performance is equal
+// bw 36ms | nm 56ms
+//
+// Case 2
+// Blackwidow performance more stronger
+// bw 18ms | nm 4338ms
+// Set中也将version提前放置了, 所以速度有明显的提升,
+// 原理和HGetall中的是一样的
+void BenchSMembers() {
+  printf("====== SMembers ======\n");
+  blackwidow::Options options;
+  options.create_if_missing = true;
+  blackwidow::BlackWidow db;
+  blackwidow::Status s = db.Open(options, "./db");
+
+  if (!s.ok()) {
+    printf("Open db failed, error: %s\n", s.ToString().c_str());
+    return;
+  }
+
+  // Test Case 1
+  int32_t ret;
+  std::vector<std::string> members_in;
+  std::vector<std::string> members_out;
+  for (int i = 0; i < ONE_HUNDRED_THOUSAND; i++) {
+    members_in.push_back("MEMBER_" + std::to_string(i));
+  }
+  db.SAdd("SMEMBERS_KEY1", members_in, &ret);
+
+  auto start = system_clock::now();
+  db.SMembers("SMEMBERS_KEY1", &members_out);
+  auto end = system_clock::now();
+  duration<double> elapsed_seconds = end - start;
+  auto cost = duration_cast<milliseconds>(elapsed_seconds).count();
+  std::cout << "Test Case 1, SMembers " << ONE_HUNDRED_THOUSAND << " Cost: " << cost << "ms" << std::endl;
+
+
+  // Test Case 2
+  members_in.clear();
+  for (size_t i = 0; i < TEN_MILLION; i++) {
+    members_in.push_back("MEMBER_" + std::to_string(i));
+  }
+  db.SAdd("SMEMBERS_KEY2", members_in, &ret);
+  std::vector<Slice> del_keys({"SMEMBERS_KEY"});
+  std::map<BlackWidow::DataType, Status> type_status;
+  db.Del(del_keys, &type_status);
+  members_in.clear();
+  for (size_t i = 0; i < ONE_HUNDRED_THOUSAND; ++i) {
+    members_in.push_back("MEMBER_" + std::to_string(i));
+  }
+  db.SAdd("SMEMBERS_KEY1", members_in, &ret);
+
+  start = system_clock::now();
+  db.SMembers("SMEMBERS_KEY1", &members_out);
+  end = system_clock::now();
+  elapsed_seconds = end - start;
+  cost = duration_cast<milliseconds>(elapsed_seconds).count();
+  std::cout << "Test Case 2, SMembers " << ONE_HUNDRED_THOUSAND << " Cost: " << cost << "ms" << std::endl;
+}
+
 int main() {
   // keys
-  BenchSet();
+  //BenchSet();
 
   // hashes
-  BenchHDel();
-  BenchHGetall();
+  //BenchHDel();
+  //BenchHGetall();
+
+  // sets
+  //BenchSAdd();
+  //BenchSPop();
+  //BenchSMembers();
 }
