@@ -260,7 +260,7 @@ void BenchSMembers() {
   auto end = system_clock::now();
   duration<double> elapsed_seconds = end - start;
   auto cost = duration_cast<milliseconds>(elapsed_seconds).count();
-  std::cout << "Test Case 1, SMembers " << ONE_HUNDRED_THOUSAND << " Cost: " << cost << "ms" << std::endl;
+  std::cout << "Test Case 1, SMembers " << members_out.size() << " Cost: " << cost << "ms" << std::endl;
 
 
   // Test Case 2
@@ -278,7 +278,7 @@ void BenchSMembers() {
   end = system_clock::now();
   elapsed_seconds = end - start;
   cost = duration_cast<milliseconds>(elapsed_seconds).count();
-  std::cout << "Test Case 2, SMembers " << ONE_HUNDRED_THOUSAND << " Cost: " << cost << "ms" << std::endl;
+  std::cout << "Test Case 2, SMembers " << members_out.size() << " Cost: " << cost << "ms" << std::endl;
   delete db;
 }
 

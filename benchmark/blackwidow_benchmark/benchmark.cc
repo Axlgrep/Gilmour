@@ -18,8 +18,8 @@ using namespace blackwidow;
 using namespace std::chrono;
 
 // Nemo performance more stronger
-// bw 45471ms  | nm 41529ms
-// Nemo的Set接口没有上锁, 虽然速度比较快, 但是不安全
+// bw 41125ms  | nm 41529ms
+// 单线程性能持平
 void BenchSet() {
   printf("====== Set ======\n");
   blackwidow::Options options;
@@ -304,7 +304,7 @@ void BenchSMembers() {
   auto end = system_clock::now();
   duration<double> elapsed_seconds = end - start;
   auto cost = duration_cast<milliseconds>(elapsed_seconds).count();
-  std::cout << "Test Case 1, SMembers " << ONE_HUNDRED_THOUSAND << " Cost: " << cost << "ms" << std::endl;
+  std::cout << "Test Case 1, SMembers " << members_out.size() << " Cost: " << cost << "ms" << std::endl;
 
 
   // Test Case 2
@@ -313,21 +313,21 @@ void BenchSMembers() {
     members_in.push_back("MEMBER_" + std::to_string(i));
   }
   db.SAdd("SMEMBERS_KEY2", members_in, &ret);
-  std::vector<Slice> del_keys({"SMEMBERS_KEY"});
+  std::vector<Slice> del_keys({"SMEMBERS_KEY2"});
   std::map<BlackWidow::DataType, Status> type_status;
   db.Del(del_keys, &type_status);
   members_in.clear();
   for (size_t i = 0; i < ONE_HUNDRED_THOUSAND; ++i) {
     members_in.push_back("MEMBER_" + std::to_string(i));
   }
-  db.SAdd("SMEMBERS_KEY1", members_in, &ret);
+  db.SAdd("SMEMBERS_KEY2", members_in, &ret);
 
   start = system_clock::now();
-  db.SMembers("SMEMBERS_KEY1", &members_out);
+  db.SMembers("SMEMBERS_KEY2", &members_out);
   end = system_clock::now();
   elapsed_seconds = end - start;
   cost = duration_cast<milliseconds>(elapsed_seconds).count();
-  std::cout << "Test Case 2, SMembers " << ONE_HUNDRED_THOUSAND << " Cost: " << cost << "ms" << std::endl;
+  std::cout << "Test Case 2, SMembers " << members_out.size() << " Cost: " << cost << "ms" << std::endl;
 }
 
 int main() {

@@ -6,7 +6,7 @@
 	url = https://github.com/Qihoo360/nemo.git
 [submodule "benchmark/blackwidow_benchmark/deps/blackwidow"]
 	path = benchmark/blackwidow_benchmark/deps/blackwidow
-	url = https://github.com/KernelMaker/blackwidow.git
+	url = https://github.com/Axlgrep/blackwidow.git 
 [submodule "benchmark/blackwidow_benchmark/deps/rocksdb"]
 	path = benchmark/blackwidow_benchmark/deps/rocksdb
 	url = https://github.com/facebook/rocksdb.git
