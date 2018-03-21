@@ -10,16 +10,19 @@
 
 #include "blackwidow/blackwidow.h"
 
+const int THREADNUM = 20;
 const int TEN_THOUSAND = 10000;
 const int ONE_HUNDRED_THOUSAND = 100000;
+const int ONE_MILLION = 1000000;
 const int TEN_MILLION = 10000000;
 
 using namespace blackwidow;
 using namespace std::chrono;
 
-// Nemo performance more stronger
-// bw 41125ms  | nm 41529ms
-// 单线程性能持平
+// Blackwidow : Test Set 10000000 Cost: 41s QPS: 250000
+// Nemo       : Test Set 10000000 Cost: 42s QPS: 238095
+// 单线程情况下Set()接口BlackWidow相对于Nemo有略微提升,
+// 可能是Blackwidow用了新版本的Rocksdb, 而新版本Rocksdb性能有提升导致的
 void BenchSet() {
   printf("====== Set ======\n");
   blackwidow::Options options;
@@ -45,8 +48,158 @@ void BenchSet() {
 
   auto end = system_clock::now();
   duration<double> elapsed_seconds = end - start;
+  auto cost = duration_cast<std::chrono::seconds>(elapsed_seconds).count();
+  std::cout << "Test Set " << TEN_MILLION << " Cost: " << cost << "s QPS: "
+    << TEN_MILLION / cost << std::endl;
+}
+
+// Blackwidow : Test MultiThread Set 20000000 Cost: 44s QPS: 454545
+// Nemo       : Test MultiThread Set 20000000 Cost: 66s QPS: 303030
+// 单线程情况下Set()接口BlackWidow相对于Nemo有较大的提升,
+// 可能是Blackwidow用了新版本的Rocksdb, 而新版本Rocksdb性能有提升导致的
+void BenchMultiThreadSet() {
+  printf("====== Multi Thread Set ======\n");
+  blackwidow::Options options;
+  options.create_if_missing = true;
+  blackwidow::BlackWidow db;
+  blackwidow::Status s = db.Open(options, "./db");
+
+  if (!s.ok()) {
+    printf("Open db failed, error: %s\n", s.ToString().c_str());
+    return;
+  }
+  std::vector<std::string> keys;
+  std::vector<std::string> values;
+  for (int i = 0; i < ONE_MILLION; i++) {
+    keys.push_back("KEY_" + std::to_string(i));
+    values.push_back("VALUE_" + std::to_string(i));
+  }
+
+  std::vector<std::thread> jobs;
+  auto start = system_clock::now();
+  for (size_t i = 0; i < THREADNUM; ++i) {
+    jobs.emplace_back([&db](std::vector<std::string> keys, std::vector<std::string> values) {
+      for (size_t j = 0; j < ONE_MILLION; ++j) {
+        db.Set(keys[j], values[j]);
+      }
+    }, keys, values);
+  }
+  for (auto& job : jobs) {
+    job.join();
+  }
+  auto end = system_clock::now();
+  duration<double> elapsed_seconds = end - start;
+  auto cost = duration_cast<std::chrono::seconds>(elapsed_seconds).count();
+  std::cout << "Test MultiThread Set " << THREADNUM * ONE_MILLION << " Cost: "
+    << cost << "s QPS: " << (THREADNUM * ONE_MILLION) / cost << std::endl;
+}
+
+// Blackwidow : Test Scan 10000 Keys Cost: 27ms
+// Nemo       : Test Scan 10000 Keys Cost: 84ms
+// 由于Blackwidow在设计之初利用了Rocksdb Column Families新特性,
+// 我们将元数据和实际数据进行分组存放(将所有的Key放在一个组里,
+// 将Sets里面的Members和Hashes里面的Field和Value等等数据放在另外
+// 一个组里面, 这样存储元数据组里的数据是少量的, 存储实际数据对
+// 应的组的数据通常是大量的), 当我们需要筛选出我们需要的Key的时
+// 候我们只需要在元数据组中进行查找(元数据组里的数据少, 查找起来
+// 非常的快速)
+// 而Nemo将元数据和实际数据混在一起存放, 这样当我们在大量的数据
+// 中查找我们所需要的Key速度是非常慢的.
+// 上面的测试结果是在数据库中存有少量数据的情况下测试的, 如果DB中
+// 数据量非常大的情况下, 差距会更加明显
+void BenchScan() {
+  printf("====== Scan ======\n");
+  blackwidow::Options options;
+  options.create_if_missing = true;
+  blackwidow::BlackWidow db;
+  blackwidow::Status s = db.Open(options, "./db");
+
+  if (!s.ok()) {
+    printf("Open db failed, error: %s\n", s.ToString().c_str());
+    return;
+  }
+
+  int32_t ret = 0;
+  BlackWidow::FieldValue fv;
+  std::vector<BlackWidow::FieldValue> fvs;
+
+  for (size_t i = 0; i < TEN_THOUSAND; ++i) {
+    fv.field = "FIELD_" + std::to_string(i);
+    fv.value = "VALUE_" + std::to_string(i);
+    fvs.push_back(fv);
+  }
+  for (size_t i = 0; i < TEN_THOUSAND; ++i) {
+    db.HMSet("SCAN_KEY" + std::to_string(i), fvs);
+  }
+
+  int64_t total = 0;
+  int64_t cursor_origin, cursor_ret = 0;
+  std::vector<std::string> keys;
+  auto start = system_clock::now();
+  for (; ;) {
+    total += keys.size();
+    keys.clear();
+    cursor_origin = cursor_ret;
+    cursor_ret = db.Scan(cursor_ret, "SCAN_KEY*", 10, &keys);
+    if (cursor_ret == 0) {
+      break;
+    }
+  }
+  auto end = system_clock::now();
+  duration<double> elapsed_seconds = end - start;
   auto cost = duration_cast<milliseconds>(elapsed_seconds).count();
-  std::cout << "Test Set " << TEN_MILLION << " Cost: " << cost << "ms" << std::endl;
+  std::cout << "Test Scan " << total
+    << " Keys Cost: "<< cost << "ms" << std::endl;
+}
+
+void BenchKeys() {
+  printf("====== Scan Keys ======\n");
+  blackwidow::Options options;
+  options.create_if_missing = true;
+  blackwidow::BlackWidow db;
+  blackwidow::Status s = db.Open(options, "./db");
+
+  if (!s.ok()) {
+    printf("Open db failed, error: %s\n", s.ToString().c_str());
+    return;
+  }
+
+  int32_t ret = 0;
+  BlackWidow::FieldValue fv;
+  std::vector<std::string> members_in;
+  std::vector<BlackWidow::FieldValue> fvs;
+  for (size_t i = 0; i < TEN_THOUSAND; ++i) {
+    fv.field = "FIELD_" + std::to_string(i);
+    fv.value = "VALUE_" + std::to_string(i);
+    fvs.push_back(fv);
+    members_in.push_back("MEMBER_" + std::to_string(i));
+  }
+
+  for (size_t i = 0; i < 5000; ++i) {
+    db.HMSet("KEYS_HASHES_KEY_" + std::to_string(i), fvs);
+    db.SAdd("KEYS_SETS_KEY_" + std::to_string(i), members_in, &ret);
+    db.Set("KEYS_STRING_KEY_" + std::to_string(i), "VALUE");
+    printf("index = %d\n", i);
+  }
+
+  int64_t total = 0;
+  int64_t cursor_origin, cursor_ret = 0;
+  std::vector<std::string> keys;
+  auto start = system_clock::now();
+  for (; ;) {
+    total += keys.size();
+    keys.clear();
+    cursor_origin = cursor_ret;
+    cursor_ret = db.Scan(cursor_ret, "*", 10, &keys);
+    if (cursor_ret == 0) {
+      break;
+    }
+  }
+  auto end = system_clock::now();
+  duration<double> elapsed_seconds = end - start;
+  auto cost = duration_cast<milliseconds>(elapsed_seconds).count();
+  std::cout << "Test Keys " << total
+    << " Keys Cost: "<< cost << "ms" << std::endl;
 }
 
 // Blackwidow performance more stronger
@@ -333,6 +486,9 @@ void BenchSMembers() {
 int main() {
   // keys
   //BenchSet();
+  //BenchMultiThreadSet();
+  BenchScan();
+  //BenchKeys();
 
   // hashes
   //BenchHDel();

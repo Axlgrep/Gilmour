@@ -10,8 +10,10 @@
 
 #include "nemo.h"
 
+const int THREADNUM = 20;
 const int TEN_THOUSAND = 10000;
 const int ONE_HUNDRED_THOUSAND = 100000;
+const int ONE_MILLION = 1000000;
 const int TEN_MILLION = 10000000;
 
 using namespace std::chrono;
@@ -40,10 +42,97 @@ void BenchSet() {
 
   auto end = system_clock::now();
   duration<double> elapsed_seconds = end - start;
-  auto cost = duration_cast<milliseconds>(elapsed_seconds).count();
-  std::cout << "Test Set " << TEN_MILLION << " Cost: " << cost << "ms" << std::endl;
+  auto cost = duration_cast<std::chrono::seconds>(elapsed_seconds).count();
+  std::cout << "Test Set " << TEN_MILLION << " Cost: " << cost << "s QPS: "
+    << TEN_MILLION / cost << std::endl;
   delete db;
 }
+
+void BenchMultiThreadSet() {
+  printf("====== Multi Thread Set ======\n");
+  nemo::Options options;
+  options.create_if_missing = true;
+  nemo::Nemo* db = new nemo::Nemo("./db", options);
+
+  if (!db) {
+    printf("Open db failed\n");
+    return;
+  }
+  std::vector<std::string> keys;
+  std::vector<std::string> values;
+  for (int i = 0; i < ONE_MILLION; i++) {
+    keys.push_back("KEY_" + std::to_string(i));
+    values.push_back("VALUE_" + std::to_string(i));
+  }
+
+  std::vector<std::thread> jobs;
+  auto start = system_clock::now();
+  for (size_t i = 0; i < THREADNUM; ++i) {
+    jobs.emplace_back([&db](std::vector<std::string> keys, std::vector<std::string> values) {
+      for (size_t j = 0; j < ONE_MILLION; ++j) {
+        db->Set(keys[j], values[j]);
+      }
+    }, keys, values);
+  }
+  for (auto& job : jobs) {
+    job.join();
+  }
+  auto end = system_clock::now();
+  duration<double> elapsed_seconds = end - start;
+  auto cost = duration_cast<std::chrono::seconds>(elapsed_seconds).count();
+  std::cout << "Test MultiThread Set " << THREADNUM * ONE_MILLION << " Cost: "
+    << cost << "s QPS: " << (THREADNUM * ONE_MILLION) / cost << std::endl;
+  delete db;
+}
+
+void BenchScan() {
+  printf("====== Scan ======\n");
+  nemo::Options options;
+  options.create_if_missing = true;
+  nemo::Nemo* db = new nemo::Nemo("./db", options);
+
+  if (!db) {
+    printf("Open db failed\n");
+    return;
+  }
+
+  int32_t ret = 0;
+  nemo::FV fv;
+  std::vector<nemo::FV> fvs;
+
+  for (size_t i = 0; i < TEN_THOUSAND; ++i) {
+    fv.field = "FIELD_" + std::to_string(i);
+    fv.val   = "VALUE_" + std::to_string(i);
+    fvs.push_back(fv);
+  }
+  for (size_t i = 0; i < TEN_THOUSAND; ++i) {
+    db->HMSet("SCAN_KEY" + std::to_string(i), fvs);
+    printf("index = %d\n", i);
+  }
+
+  int64_t total = 0;
+  std::string pattern = "SCAN_KEY*";
+  int64_t cursor_origin, cursor_ret = 0;
+  std::vector<std::string> keys;
+  auto start = system_clock::now();
+  for (; ;) {
+    total += keys.size();
+    keys.clear();
+    cursor_origin = cursor_ret;
+    db->Scan(cursor_origin, pattern, 10, keys, &cursor_ret);
+    if (cursor_ret == 0) {
+      break;
+    }
+  }
+  auto end = system_clock::now();
+  duration<double> elapsed_seconds = end - start;
+  auto cost = duration_cast<milliseconds>(elapsed_seconds).count();
+  std::cout << "Test Scan " << total
+    << " Keys Cost: "<< cost << "ms" << std::endl;
+
+  delete db;
+}
+
 
 void BenchHDel() {
   printf("====== HDel ======\n");
@@ -285,6 +374,8 @@ void BenchSMembers() {
 int main() {
   // keys
   //BenchSet();
+  //BenchMultiThreadSet();
+  BenchScan();
 
   // hashes
   //BenchHDel();
