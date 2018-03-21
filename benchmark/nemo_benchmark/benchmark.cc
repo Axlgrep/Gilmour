@@ -420,9 +420,9 @@ int main() {
   //BenchScan();
 
   // hashes
-  //BenchHDel();
+  //BenchHMSet();
+  BenchHDel();
   //BenchHGetall();
-  BenchHMSet();
 
   // sets
   //BenchSAdd();

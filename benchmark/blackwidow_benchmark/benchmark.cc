@@ -255,8 +255,19 @@ void BenchHMSet() {
 // bw 156507ms | nm 198454ms
 //
 // 单个删除Hash表中的Field测试中, Blackwidow比nemo性能要快，
-// 并且Blackwidow还支持一次删除多个Field, 这样相比较于单个
-// 删除, 速度还要更加快.
+// 由于Nemo中EncodeHashKey的做法是将数据逐一Append到string
+// 后面, 这样可能会导致string扩容然后重新拷贝已有数据, 再加
+// EncodeHashKey直接返回的是String对象，这样会多走一次构造
+// 函数引起性能消耗.
+// 而BlackWidow会提前计算出HashKey所需的空间, 一次性进行分配
+// 所需空间, 没有扩容重新拷贝以后数据的情况存在, 并且在
+// Blackwidow当中广泛采用Slice, 这样只传递String中数据指针以
+// 及大小的方法避免了重新构造String类型对象, 也是BlackWidow
+// 性能提升的原因之一
+// 另外Nemo中的HDel方法只支持一次删除一个Hash表中的Field, 而
+// BlackWidow兼容了最新的Redis版本, 一次可以删除Hash表中的多
+// 个Field, 这样一次删除多个Field肯定比Nemo中一次删除一个Field
+// 要快很多
 void BenchHDel() {
   printf("====== HDel ======\n");
   blackwidow::Options options;
@@ -540,9 +551,9 @@ int main() {
   //BenchKeys();
 
   // hashes
-  //BenchHDel();
+  //BenchHMSet();
+  BenchHDel();
   //BenchHGetall();
-  BenchHMSet();
 
   // sets
   //BenchSAdd();
