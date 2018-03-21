@@ -306,21 +306,23 @@ void BenchHDel() {
 }
 
 // Case 1
-// Performance is equal
-// bw 30ms | nm 51ms
+// Blackwidow : Test case 1, HGetall 100000 Field HashTable Cost: 30ms
+// Nemo       : Test case 1, HGetall 100000 Field HashTable Cost: 57ms
+// 创建一个大小为100000的Hash表, 然后新旧引擎进行对比测试, Blackwidow
+// 要稍微快一点的原因是由于采用了Slice以及一次性分配HashKey所需要的空
+// 间, 减少了重新分配空间以及String构造函数引起的性能消耗
 //
 // Case 2
-// Blackwidow performance more stronger
-// bw 31ms | nm 3531ms
-// blackwidow把Version放到了Hash键当中, 当我们删除一个Hash表然后创建同名Hash表,
-// version会变化, 我们可以快速的Seek到rockdb中当前Hash表的数据.
-// nemo将Version放到Hash值当中, 上面这种情况会遍历新Hash表旧Hash表所有的Field,
-// 然后逐一匹配version, 所以速度比较慢
-//
-// Case 3
-// Nemo performance more stronger
-// bw 4539ms | nm 659ms
-// 原因待查
+// Blackwidow : Test case 2, HGetall 10000 Field HashTable Cost: 5ms
+// Nemo       : Test case 2, HGetall 10000 Field HashTable Cost: 4899ms
+// 创建一个大的Hash表, 然后删除该Hash表, 再创建一个同名Hash表, 这时候再
+// 用新旧引擎进行HGetall对比测试, Blackwidow性能要明显高于Nemo.
+// 由于Blackwidow在设计的时候将Version放到了HashKey当中, 由于新旧Hash表的
+// version不一样, 所以在RocksDB中存储的位置也不一样, 我们可以快速的Seek
+// 到新的Hash的数据块然后取出来
+// Nemo中由于没有将Version提前放置, 所以在RocksDB没有做Compaction之前, 新
+// 旧Hash表中的数据混在一起存放, 这时候要从一大堆的数据中筛选出我们想要
+// 的数据, 这个操作是很慢的.
 void BenchHGetall() {
   printf("====== HGetall ======\n");
   blackwidow::Options options;
@@ -376,7 +378,7 @@ void BenchHGetall() {
   std::map<BlackWidow::DataType, Status> type_status;
   db.Del(del_keys, &type_status);
   fvs_in.clear();
-  for (size_t i = 0; i < ONE_HUNDRED_THOUSAND; ++i) {
+  for (size_t i = 0; i < TEN_THOUSAND; ++i) {
     fv.field = "FIELD_" + std::to_string(i);
     fv.value = "VALUE_" + std::to_string(i);
     fvs_in.push_back(fv);
@@ -390,31 +392,6 @@ void BenchHGetall() {
   elapsed_seconds = end - start;
   cost = duration_cast<milliseconds>(elapsed_seconds).count();
   std::cout << "Test case 2, HGetall " << fvs_out.size()
-    << " Field HashTable Cost: "<< cost << "ms" << std::endl;
-
-  // 1. Create the hash table then insert hash table 10000000 field
-  // 2. Delete hash table 9990000 field, the hash table remain 10000 field
-  // 3. HGetall the hash table 10000 field (statistics cost time)
-  fvs_in.clear();
-  for (size_t i = 0; i < TEN_MILLION; ++i) {
-    fv.field = "FIELD_" + std::to_string(i);
-    fv.value = "VALUE_" + std::to_string(i);
-    fvs_in.push_back(fv);
-  }
-  db.HMSet("HGETALL_KEY3", fvs_in);
-  fields.clear();
-  for (size_t i = 0; i < TEN_MILLION - ONE_HUNDRED_THOUSAND; ++i) {
-    fields.push_back("FIELD_" + std::to_string(i));
-  }
-  db.HDel("HGETALL_KEY3", fields, &ret);
-
-  fvs_out.clear();
-  start = system_clock::now();
-  db.HGetall("HGETALL_KEY3", &fvs_out);
-  end = system_clock::now();
-  elapsed_seconds = end - start;
-  cost = duration_cast<milliseconds>(elapsed_seconds).count();
-  std::cout << "Test case 3, HGetall " << fvs_out.size()
     << " Field HashTable Cost: "<< cost << "ms" << std::endl;
 }
 
@@ -552,8 +529,8 @@ int main() {
 
   // hashes
   //BenchHMSet();
-  BenchHDel();
-  //BenchHGetall();
+  //BenchHDel();
+  BenchHGetall();
 
   // sets
   //BenchSAdd();

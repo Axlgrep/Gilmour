@@ -264,9 +264,9 @@ void BenchHGetall() {
   int64_t count;
   db->Del("HGETALL_KEY2", &count);
   fvs_in.clear();
-  for (size_t i = 0; i < ONE_HUNDRED_THOUSAND; ++i) {
+  for (size_t i = 0; i < TEN_THOUSAND; ++i) {
     fv.field = "FIELD_" + std::to_string(i);
-    fv.val = "VALUE_" + std::to_string(i);
+    fv.val   = "VALUE_" + std::to_string(i);
     fvs_in.push_back(fv);
   }
   db->HMSet("HGETALL_KEY2", fvs_in);
@@ -278,29 +278,6 @@ void BenchHGetall() {
   elapsed_seconds = end - start;
   cost = duration_cast<milliseconds>(elapsed_seconds).count();
   std::cout << "Test case 2, HGetall " << fvs_out.size()
-    << " Field HashTable Cost: "<< cost << "ms" << std::endl;
-
-  // 1. Create the hash table then insert hash table 10000000 field
-  // 2. Delete hash table 9990000 field, the hash table remain 100000 field
-  // 3. HGetall the hash table 100000 field (statistics cost time)
-  fvs_in.clear();
-  for (size_t i = 0; i < TEN_MILLION; ++i) {
-    fv.field = "FIELD_" + std::to_string(i);
-    fv.val = "VALUE_" + std::to_string(i);
-    fvs_in.push_back(fv);
-  }
-  db->HMSet("HGETALL_KEY3", fvs_in);
-  for (size_t i = 0; i < TEN_MILLION - ONE_HUNDRED_THOUSAND; ++i) {
-    db->HDel("HGETALL_KEY3", "FIELD_" + std::to_string(i));
-  }
-
-  fvs_out.clear();
-  start = system_clock::now();
-  db->HGetall("HGETALL_KEY3", fvs_out);
-  end = system_clock::now();
-  elapsed_seconds = end - start;
-  cost = duration_cast<milliseconds>(elapsed_seconds).count();
-  std::cout << "Test case 3, HGetall " << fvs_out.size()
     << " Field HashTable Cost: "<< cost << "ms" << std::endl;
 
   delete db;
@@ -421,8 +398,8 @@ int main() {
 
   // hashes
   //BenchHMSet();
-  BenchHDel();
-  //BenchHGetall();
+  //BenchHDel();
+  BenchHGetall();
 
   // sets
   //BenchSAdd();
