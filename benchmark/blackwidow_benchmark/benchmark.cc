@@ -481,14 +481,27 @@ void BenchSPop() {
 }
 
 // Case 1
-// Performance is equal
-// bw 36ms | nm 56ms
+// Blackwidow : Test Case 1, SMembers 100000 Cost: 38ms
+// Nemo       : Test Case 1, SMembers 100000 Cost: 56ms
+// 创建一个大小为100000的Set集合, 然后新旧引擎进行Smembers对比测试,
+// Blackwidow要稍微快一点是由于新版Blackwidow在设计之初将Version
+// 放在Key中进行存放, 这样保证当前数据结构的所有数据在Rocksdb中都是
+// 存放在一起的, 这样查找起来比较快速
+// Nemo将元数据以及真实数据放在一起存放, 并且由于设计原因会导致不同
+// 的Sets中间的Members数据在Rocksdb中混在一起存放, 这样查找起来效率
+// 不高
 //
 // Case 2
-// Blackwidow performance more stronger
-// bw 18ms | nm 4338ms
-// Set中也将version提前放置了, 所以速度有明显的提升,
-// 原理和HGetall中的是一样的
+// Blackwidow : Test Case 2, SMembers 200000 Cost: 36ms
+// Nemo       : Test Case 2, SMembers 200000 Cost: 4373ms
+// 创建一个大的Hash表, 然后删除该Hash表, 再创建一个同名Hash表, 这时候再
+// 用新旧引擎进行HGetall对比测试, Blackwidow性能要明显高于Nemo.
+// 由于Blackwidow在设计的时候将Version放到了SetsMemberKey当中, 由于新旧
+// Set集合的version不一样, 所以新旧集合的SetsMemberKey在Rocksdb中也会分
+// 开存放, 我们可以快速的Seek到新的Set的数据块然后取出来
+// Nemo中由于没有将Version提前放置, 所以在RocksDB没有做Compaction之前, 新
+// 旧Sets中的数据混在一起存放, 这时候要从一大堆的数据中筛选出我们想要
+// 的数据, 这个操作是很慢的.
 void BenchSMembers() {
   printf("====== SMembers ======\n");
   blackwidow::Options options;
@@ -554,7 +567,7 @@ int main() {
   //BenchHGetall();
 
   // sets
-  BenchSAdd();
+  //BenchSAdd();
   //BenchSPop();
-  //BenchSMembers();
+  BenchSMembers();
 }

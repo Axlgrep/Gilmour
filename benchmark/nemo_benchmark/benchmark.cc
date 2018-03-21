@@ -414,7 +414,7 @@ int main() {
   //BenchHGetall();
 
   // sets
-  BenchSAdd();
+  //BenchSAdd();
   //BenchSPop();
-  //BenchSMembers();
+  BenchSMembers();
 }
