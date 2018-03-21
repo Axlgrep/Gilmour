@@ -11,6 +11,7 @@
 #include "nemo.h"
 
 const int THREADNUM = 20;
+const int ONE_THOUSAND = 1000;
 const int TEN_THOUSAND = 10000;
 const int ONE_HUNDRED_THOUSAND = 100000;
 const int ONE_MILLION = 1000000;
@@ -132,6 +133,47 @@ void BenchScan() {
 
   delete db;
 }
+
+void BenchHMSet() {
+  printf("====== HMSet ======\n");
+  nemo::Options options;
+  options.create_if_missing = true;
+  nemo::Nemo* db = new nemo::Nemo("./db", options);
+
+  if (!db) {
+    printf("Open db failed\n");
+    return;
+  }
+
+  nemo::FV fv;
+  std::vector<nemo::FV> fvs;
+
+  for (size_t i = 0; i < 100; ++i) {
+    fv.field = "FIELD_" + std::to_string(i);
+    fv.val   = "VALUE_" + std::to_string(i);
+    fvs.push_back(fv);
+  }
+
+  std::vector<std::thread> jobs;
+  auto start = system_clock::now();
+  for (size_t i = 0; i < THREADNUM; ++i) {
+    jobs.emplace_back([&db](size_t index, std::vector<nemo::FV> fvs) {
+      for (size_t j = 0; j < TEN_THOUSAND ; ++j) {
+        db->HMSet("KEYS_HMSET_" + std::to_string(index * TEN_THOUSAND + j), fvs);
+      }
+    }, i, fvs);
+  }
+  for (auto& job : jobs) {
+    job.join();
+  }
+  auto end = system_clock::now();
+  duration<double> elapsed_seconds = end - start;
+  auto cost = duration_cast<std::chrono::seconds>(elapsed_seconds).count();
+  std::cout << "Test HMSet " << THREADNUM * TEN_THOUSAND << " Hashes Table Cost: "
+    << cost << "s QPS: " << (THREADNUM * TEN_THOUSAND) / cost << std::endl;
+  delete db;
+}
+
 
 
 void BenchHDel() {
@@ -375,11 +417,12 @@ int main() {
   // keys
   //BenchSet();
   //BenchMultiThreadSet();
-  BenchScan();
+  //BenchScan();
 
   // hashes
   //BenchHDel();
   //BenchHGetall();
+  BenchHMSet();
 
   // sets
   //BenchSAdd();

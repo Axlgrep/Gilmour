@@ -11,6 +11,7 @@
 #include "blackwidow/blackwidow.h"
 
 const int THREADNUM = 20;
+const int ONE_THOUSAND = 1000;
 const int TEN_THOUSAND = 10000;
 const int ONE_HUNDRED_THOUSAND = 100000;
 const int ONE_MILLION = 1000000;
@@ -201,6 +202,54 @@ void BenchKeys() {
   std::cout << "Test Keys " << total
     << " Keys Cost: "<< cost << "ms" << std::endl;
 }
+
+// Blackwidow : Test HMSet 200000 Hashes Table Cost: 10s QPS: 20000
+// Nemo       : Test HMSet 200000 Hashes Table Cost: 126s QPS: 1587
+// Nemo中HMSet的做法是遍历当前需要添加的所有FieldValue, 然后逐一调用
+// HSet方法, 这样的话, 由于每次调用都要对当前Hash表的Key加锁解锁, 所
+// 以速度非常慢, 并且没法保证整个HMSet操作的原子性.
+// BlackWidow中首先对当前Hash表的Key进行上锁, 然后将修改Meta信息以及
+// 添加FieldValue的操作都放到RockDB中的一个WriteBatch中去完成, 既保证
+// 了整个HMSet操作的原子性, 速度对比与Nemo也有很大的提升.
+void BenchHMSet() {
+  printf("====== HMSet ======\n");
+  blackwidow::Options options;
+  options.create_if_missing = true;
+  blackwidow::BlackWidow db;
+  blackwidow::Status s = db.Open(options, "./db");
+
+  if (!s.ok()) {
+    printf("Open db failed, error: %s\n", s.ToString().c_str());
+    return;
+  }
+
+  BlackWidow::FieldValue fv;
+  std::vector<BlackWidow::FieldValue> fvs;
+  for (size_t i = 0; i < 100; ++i) {
+    fv.field = "FIELD_" + std::to_string(i);
+    fv.value = "VALUE_" + std::to_string(i);
+    fvs.push_back(fv);
+  }
+
+  std::vector<std::thread> jobs;
+  auto start = system_clock::now();
+  for (size_t i = 0; i < THREADNUM; ++i) {
+    jobs.emplace_back([&db](size_t index, std::vector<BlackWidow::FieldValue> fvs) {
+      for (size_t j = 0; j < TEN_THOUSAND ; ++j) {
+        db.HMSet("KEYS_HMSET_" + std::to_string(index * TEN_THOUSAND + j), fvs);
+      }
+    }, i, fvs);
+  }
+  for (auto& job : jobs) {
+    job.join();
+  }
+  auto end = system_clock::now();
+  duration<double> elapsed_seconds = end - start;
+  auto cost = duration_cast<std::chrono::seconds>(elapsed_seconds).count();
+  std::cout << "Test HMSet " << THREADNUM * TEN_THOUSAND << " Hashes Table Cost: "
+    << cost << "s QPS: " << (THREADNUM * TEN_THOUSAND) / cost << std::endl;
+}
+
 
 // Blackwidow performance more stronger
 // bw 156507ms | nm 198454ms
@@ -487,12 +536,13 @@ int main() {
   // keys
   //BenchSet();
   //BenchMultiThreadSet();
-  BenchScan();
+  //BenchScan();
   //BenchKeys();
 
   // hashes
   //BenchHDel();
   //BenchHGetall();
+  BenchHMSet();
 
   // sets
   //BenchSAdd();
