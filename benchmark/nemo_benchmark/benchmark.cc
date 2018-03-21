@@ -133,6 +133,50 @@ void BenchScan() {
   delete db;
 }
 
+void BenchHSet() {
+  printf("====== HSet ======\n");
+  nemo::Options options;
+  options.create_if_missing = true;
+  nemo::Nemo* db = new nemo::Nemo("./db", options);
+
+  if (!db) {
+    printf("Open db failed\n");
+    return;
+  }
+
+  nemo::FV fv;
+  std::vector<nemo::FV> fvs;
+
+  for (size_t i = 0; i < 100; ++i) {
+    fv.field = "FIELD_" + std::to_string(i);
+    fv.val   = "VALUE_" + std::to_string(i);
+    fvs.push_back(fv);
+  }
+
+  std::vector<std::thread> jobs;
+  auto start = system_clock::now();
+  for (size_t i = 0; i < THREADNUM; ++i) {
+    jobs.emplace_back([&db](size_t index, std::vector<nemo::FV> fvs) {
+      for (size_t j = 0; j < TEN_THOUSAND ; ++j) {
+        int32_t ret;
+        std::string cur_key = "KEYS_HSET_" + std::to_string(index * TEN_THOUSAND + j);
+        for (const auto& fv : fvs) {
+          db->HSet(cur_key, fv.field, fv.val);
+        }
+      }
+    }, i, fvs);
+  }
+  for (auto& job : jobs) {
+    job.join();
+  }
+  auto end = system_clock::now();
+  duration<double> elapsed_seconds = end - start;
+  auto cost = duration_cast<std::chrono::seconds>(elapsed_seconds).count();
+  std::cout << "Test HSet " << THREADNUM * TEN_THOUSAND << " Hashes Table Cost: "
+    << cost << "s QPS: " << (THREADNUM * TEN_THOUSAND) / cost << std::endl;
+  delete db;
+}
+
 void BenchHMSet() {
   printf("====== HMSet ======\n");
   nemo::Options options;
@@ -172,8 +216,6 @@ void BenchHMSet() {
     << cost << "s QPS: " << (THREADNUM * TEN_THOUSAND) / cost << std::endl;
   delete db;
 }
-
-
 
 void BenchHDel() {
   printf("====== HDel ======\n");
@@ -408,6 +450,7 @@ int main() {
   //BenchScan();
 
   // hashes
+  BenchHSet();
   //BenchHMSet();
   //BenchHDel();
   //BenchHGetall();

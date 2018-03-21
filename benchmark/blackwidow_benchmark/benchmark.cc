@@ -214,9 +214,65 @@ void BenchKeys() {
     << " Keys Cost: "<< cost << "ms" << std::endl;
 }
 
-// Blackwidow : Test HMSet 200000 Hashes Table Cost: 10s QPS: 20000
+// Blackwidow : Test HSet 200000 Hashes Table Cost: 94s  QPS: 2127
+// Nemo       : Test HSet 200000 Hashes Table Cost: 129s QPS: 1550
+// 测试场景 :  开20个线程调用HSet向引擎中写入总量为200000大小为100
+// 的Hash Table.
+// 测试结果 :  Blackwidow的性能明显高于Nemo
+//
+// 原因分析 : Blackwidow中使用了Slice, 减少了没必要的String对象的创建
+// 并且一次性将当前Sets的Field, Verion以及TTL信息写入到了数据Key当中,
+// 而Nemo的HSet方法中中存在一些返回String对象的方法, 这样会构造String
+// 对象, 然后先是通过Nemo用KV模拟多数据结构,  然后再调用nemo-rocksdb追
+// 加Version以及TTL等信息, 这样有可能会导致重新分配内存, 并且会拷贝数据
+// 造成性能开销.
+void BenchHSet() {
+  printf("====== HSet ======\n");
+  blackwidow::Options options;
+  options.create_if_missing = true;
+  blackwidow::BlackWidow db;
+  blackwidow::Status s = db.Open(options, "./db");
+
+  if (!s.ok()) {
+    printf("Open db failed, error: %s\n", s.ToString().c_str());
+    return;
+  }
+
+  BlackWidow::FieldValue fv;
+  std::vector<BlackWidow::FieldValue> fvs;
+  for (size_t i = 0; i < 100; ++i) {
+    fv.field = "FIELD_" + std::to_string(i);
+    fv.value = "VALUE_" + std::to_string(i);
+    fvs.push_back(fv);
+  }
+
+  std::vector<std::thread> jobs;
+  auto start = system_clock::now();
+  for (size_t i = 0; i < THREADNUM; ++i) {
+    jobs.emplace_back([&db](size_t index, std::vector<BlackWidow::FieldValue> fvs) {
+      for (size_t j = 0; j < TEN_THOUSAND ; ++j) {
+        int32_t ret;
+        std::string cur_key = "KEYS_HSET_" + std::to_string(index * TEN_THOUSAND + j);
+        for (const auto& fv : fvs) {
+          db.HSet(cur_key, fv.field, fv.value, &ret);
+        }
+      }
+    }, i, fvs);
+  }
+  for (auto& job : jobs) {
+    job.join();
+  }
+  auto end = system_clock::now();
+  duration<double> elapsed_seconds = end - start;
+  auto cost = duration_cast<std::chrono::seconds>(elapsed_seconds).count();
+  std::cout << "Test HSet " << THREADNUM * TEN_THOUSAND << " Hashes Table Cost: "
+    << cost << "s QPS: " << (THREADNUM * TEN_THOUSAND) / cost << std::endl;
+}
+
+// Blackwidow : Test HMSet 200000 Hashes Table Cost: 10s  QPS: 20000
 // Nemo       : Test HMSet 200000 Hashes Table Cost: 126s QPS: 1587
-// 测试场景 :  开20个线程向引擎中写入总量为200000的Hash Table.
+// 测试场景 :  开20个线程向调用HMSet向引擎中写入总量为200000大小为100
+// 的Hash Table.
 // 测试结果 :  Blackwidow的性能明显高于Nemo
 //
 // 测试分析 : Nemo中HMSet的做法是遍历当前需要添加的所有FieldValue, 然
@@ -272,11 +328,11 @@ void BenchHMSet() {
 // 测试结果 : Blackwidow的性能略微高于Nemo
 //
 // 原因分析 :  由于Nemo中EncodeHashKey的做法是将数据逐一
-// Append到string后面, 这样可能会导致string扩容然后重新拷
-// 贝已有数据, 再加上EncodeHashKey直接返回的是String对象，这
-// 样会多走一次构造函数引起性能消耗.
+// Append到string后面, 这样可能会导致string重新分配内存然后
+// 重新拷贝已有数据, 再加上EncodeHashKey直接返回的是String
+// 对象，这样会多走一次构造函数引起性能消耗.
 // 而BlackWidow会提前计算出HashKey所需的空间, 一次性进行分配
-// 所需空间, 没有扩容重新拷贝以后数据的情况存在, 并且在
+// 所需空间, 没有重新分配内存拷贝数据的情况存在, 并且在
 // Blackwidow当中广泛采用Slice, 这样只传递String中数据指针以
 // 及大小的方法避免了重新构造String类型对象, 也是BlackWidow
 // 性能提升的原因之一
@@ -592,6 +648,7 @@ int main() {
   //BenchKeys();
 
   // hashes
+  BenchHSet();
   //BenchHMSet();
   //BenchHDel();
   //BenchHGetall();
