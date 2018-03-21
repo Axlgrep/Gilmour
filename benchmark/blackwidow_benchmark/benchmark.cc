@@ -395,12 +395,21 @@ void BenchHGetall() {
     << " Field HashTable Cost: "<< cost << "ms" << std::endl;
 }
 
-// Blackwidow performance more stronger
-// bw 388640ms | nm 165896ms
+// Blackwidow : Test SAdd 200000 Sets Cost: 95s  QPS:2105
+// Nemo       : Test SAdd 200000 Sets Cost: 123s QPS:1626
 //
-// 因为blackwidow内的SAdd可以支持一次添加多个member, 而nemo
-// 一次SAdd操作只能想集合中添加一个member，期间每次操作都要
-// 上锁解锁, 所以比较慢
+// 开20个线程向引擎中写入200000个大小为1000的Set集合, Blackwidow
+// 性能明显比Nemo要高.
+// Nemo内部EncodeSetKey是向String后面Append内容, 这样可能会导致重新
+// 分配内存, 并且该方法返回的是String对象, 会额外调用一次String的构
+// 造函数造成性能消耗.
+// BlackWidow内部一次性分配我们需要拼接Key的空间, 并且返回的是数据内容
+// 的指针, 而不是重新构造这个String对象, 所以性能明显提升.
+// 并且Blackwidow的SAdd接口兼容最新版本的Redis, 一次可以向集合中添加多
+// 个Member, 并且添加的多个Member在Blackwidow中是做一次Bacth的操作, 所
+// 以, 在一次需要向同一个集合中添加多个Member这种情景下Blackwidow会明显
+// 优于Nemo
+//
 void BenchSAdd() {
   printf("====== SAdd ======\n");
   blackwidow::Options options;
@@ -413,20 +422,32 @@ void BenchSAdd() {
     return;
   }
 
-  int32_t ret;
   std::vector<std::string> members_in;
-  for (int i = 0; i < TEN_MILLION; i++) {
+  for (int i = 0; i < 100; i++) {
     members_in.push_back("MEMBER_" + std::to_string(i));
   }
 
+  std::vector<std::thread> jobs;
   auto start = system_clock::now();
-  for (const auto& member : members_in) {
-    db.SAdd("SADD_KEY", {member}, &ret);
+  for (size_t i = 0; i < THREADNUM; ++i) {
+    jobs.emplace_back([&db](size_t index, std::vector<std::string> members_in) {
+      for (size_t j = 0; j < TEN_THOUSAND ; ++j) {
+        int32_t ret;
+        std::string cur_key = "SADD_KEY" + std::to_string(index * TEN_THOUSAND + j);
+        for (const auto& member : members_in) {
+          db.SAdd(cur_key, {member}, &ret);
+        }
+      }
+    }, i, members_in);
+  }
+  for (auto& job : jobs) {
+    job.join();
   }
   auto end = system_clock::now();
   duration<double> elapsed_seconds = end - start;
-  auto cost = duration_cast<milliseconds>(elapsed_seconds).count();
-  std::cout << "Test SAdd " << TEN_MILLION << " Cost: " << cost << "ms" << std::endl;
+  auto cost = duration_cast<std::chrono::seconds>(elapsed_seconds).count();
+  std::cout << "Test SAdd " << (THREADNUM * TEN_THOUSAND) << " Sets Cost: " << cost
+    << "s QPS:" << (THREADNUM * TEN_THOUSAND) / cost << std::endl;
 }
 
 void BenchSPop() {
@@ -530,10 +551,10 @@ int main() {
   // hashes
   //BenchHMSet();
   //BenchHDel();
-  BenchHGetall();
+  //BenchHGetall();
 
   // sets
-  //BenchSAdd();
+  BenchSAdd();
   //BenchSPop();
   //BenchSMembers();
 }

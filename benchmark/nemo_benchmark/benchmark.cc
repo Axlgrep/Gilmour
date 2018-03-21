@@ -294,20 +294,32 @@ void BenchSAdd() {
     return;
   }
 
-  int64_t ret;
   std::vector<std::string> members_in;
-  for (int i = 0; i < TEN_MILLION; i++) {
+  for (int i = 0; i < 100; i++) {
     members_in.push_back("MEMBER_" + std::to_string(i));
   }
 
+  std::vector<std::thread> jobs;
   auto start = system_clock::now();
-  for (const auto& member : members_in) {
-    db->SAdd("SADD_KEY", member, &ret);
+  for (size_t i = 0; i < THREADNUM; ++i) {
+    jobs.emplace_back([&db](size_t index, std::vector<std::string> members_in) {
+      for (size_t j = 0; j < TEN_THOUSAND ; ++j) {
+        int64_t ret;
+        std::string cur_key = "SADD_KEY" + std::to_string(index * TEN_THOUSAND + j);
+        for (const auto& member : members_in) {
+          db->SAdd(cur_key, member, &ret);
+        }
+      }
+    }, i, members_in);
+  }
+  for (auto& job : jobs) {
+    job.join();
   }
   auto end = system_clock::now();
   duration<double> elapsed_seconds = end - start;
-  auto cost = duration_cast<milliseconds>(elapsed_seconds).count();
-  std::cout << "Test SAdd " << TEN_MILLION << " Cost: " << cost << "ms" << std::endl;
+  auto cost = duration_cast<std::chrono::seconds>(elapsed_seconds).count();
+  std::cout << "Test SAdd " << (THREADNUM * TEN_THOUSAND) << " Sets Cost: " << cost
+    << "s QPS:" << (THREADNUM * TEN_THOUSAND) / cost << std::endl;
 
   delete db;
 }
@@ -399,10 +411,10 @@ int main() {
   // hashes
   //BenchHMSet();
   //BenchHDel();
-  BenchHGetall();
+  //BenchHGetall();
 
   // sets
-  //BenchSAdd();
+  BenchSAdd();
   //BenchSPop();
   //BenchSMembers();
 }
