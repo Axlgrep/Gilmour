@@ -108,7 +108,6 @@ void BenchScan() {
   }
   for (size_t i = 0; i < TEN_THOUSAND; ++i) {
     db->HMSet("SCAN_KEY" + std::to_string(i), fvs);
-    printf("index = %d\n", i);
   }
 
   int64_t total = 0;
@@ -208,7 +207,7 @@ void BenchHDel() {
   auto end = system_clock::now();
   duration<double> elapsed_seconds = end - start;
   auto cost = duration_cast<milliseconds>(elapsed_seconds).count();
-  std::cout << "HDel " << fvs.size()
+  std::cout << "Test HDel " << fvs.size()
     << " Hash Field Cost: "<< cost << "ms" << std::endl;
   delete db;
 }
@@ -416,5 +415,5 @@ int main() {
   // sets
   //BenchSAdd();
   //BenchSPop();
-  BenchSMembers();
+  //BenchSMembers();
 }
