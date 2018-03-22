@@ -26,8 +26,10 @@ using namespace std::chrono;
 using std::default_random_engine;
 
 static int32_t last_seed = 0;
+const std::string KEY_PREFIX = "KEY_";
+const std::string VALUE_PREFIX = "VALUE_";
 
-void GenerateRandomString(std::string& prefix,
+void GenerateRandomString(const std::string& prefix,
                           int32_t len,
                           std::string* target) {
   target->clear();
@@ -63,23 +65,23 @@ void BenchSet() {
     printf("Open db failed\n");
     return;
   }
-  std::vector<std::string> keys;
-  std::vector<std::string> values;
+  nemo::KV kv;
+  std::vector<nemo::KV> kvs;
   for (int i = 0; i < TEN_MILLION; i++) {
-    keys.push_back("KEY_" + std::to_string(i));
-    values.push_back("VALUE_" + std::to_string(i));
+    GenerateRandomString(KEY_PREFIX, KEY_SIZE, &kv.key);
+    GenerateRandomString(KEY_PREFIX, KEY_SIZE, &kv.val);
+    kvs.push_back(kv);
   }
 
   auto start = system_clock::now();
-  for (uint32_t i = 0; i < TEN_MILLION; ++i) {
-    db->Set(keys[i], values[i]);
+  for (const auto& kv : kvs) {
+    db->Set(kv.key, kv.val);
   }
-
   auto end = system_clock::now();
   duration<double> elapsed_seconds = end - start;
   auto cost = duration_cast<std::chrono::seconds>(elapsed_seconds).count();
-  std::cout << "Test Set " << TEN_MILLION << " Cost: " << cost << "s QPS: "
-    << TEN_MILLION / cost << std::endl;
+  std::cout << "Test Set " << kvs.size() << " KV Cost: " << cost << "s QPS: "
+    << kvs.size() / cost << std::endl;
   delete db;
 }
 
@@ -93,21 +95,23 @@ void BenchMultiThreadSet() {
     printf("Open db failed\n");
     return;
   }
-  std::vector<std::string> keys;
-  std::vector<std::string> values;
-  for (int i = 0; i < ONE_MILLION; i++) {
-    keys.push_back("KEY_" + std::to_string(i));
-    values.push_back("VALUE_" + std::to_string(i));
+
+  nemo::KV kv;
+  std::vector<nemo::KV> kvs;
+  for (int i = 0; i < TEN_MILLION; i++) {
+    GenerateRandomString(KEY_PREFIX, KEY_SIZE, &kv.key);
+    GenerateRandomString(KEY_PREFIX, KEY_SIZE, &kv.val);
+    kvs.push_back(kv);
   }
 
   std::vector<std::thread> jobs;
   auto start = system_clock::now();
   for (size_t i = 0; i < THREADNUM; ++i) {
-    jobs.emplace_back([&db](std::vector<std::string> keys, std::vector<std::string> values) {
-      for (size_t j = 0; j < ONE_MILLION; ++j) {
-        db->Set(keys[j], values[j]);
+    jobs.emplace_back([&db](std::vector<nemo::KV> kvs) {
+      for (const auto& kv : kvs) {
+        db->Set(kv.key, kv.val);
       }
-    }, keys, values);
+    }, kvs);
   }
   for (auto& job : jobs) {
     job.join();
@@ -115,8 +119,8 @@ void BenchMultiThreadSet() {
   auto end = system_clock::now();
   duration<double> elapsed_seconds = end - start;
   auto cost = duration_cast<std::chrono::seconds>(elapsed_seconds).count();
-  std::cout << "Test MultiThread Set " << THREADNUM * ONE_MILLION << " Cost: "
-    << cost << "s QPS: " << (THREADNUM * ONE_MILLION) / cost << std::endl;
+  std::cout << "Test MultiThread Set " << THREADNUM * kvs.size() << " KV Cost: "
+    << cost << "s QPS: " << (THREADNUM * kvs.size()) / cost << std::endl;
   delete db;
 }
 
@@ -520,14 +524,14 @@ void BenchSMembers() {
 int main() {
   // keys
   //BenchSet();
-  //BenchMultiThreadSet();
+  BenchMultiThreadSet();
   //BenchScan();
 
   // hashes
   //BenchHSet();
   //BenchHMSet();
   //BenchHDel();
-  BenchHKeys();
+  //BenchHKeys();
   //BenchHGetall();
 
   // sets

@@ -27,8 +27,10 @@ using namespace std::chrono;
 using std::default_random_engine;
 
 static int32_t last_seed = 0;
+const std::string KEY_PREFIX = "KEY_";
+const std::string VALUE_PREFIX = "VALUE_";
 
-void GenerateRandomString(std::string& prefix,
+void GenerateRandomString(const std::string& prefix,
                           int32_t len,
                           std::string* target) {
   target->clear();
@@ -54,13 +56,31 @@ void GenerateRandomString(std::string& prefix,
   }
 }
 
-// Blackwidow : Test Set 10000000 Cost: 41s QPS: 250000
-// Nemo       : Test Set 10000000 Cost: 42s QPS: 238095
-// 测试场景 : 单线程情况下向存储引擎写入10000000个键值对
-// 测试结果 : Blackwidow的性能与Nemo相差不大
+// Blackwidow : Test Set 10000000 KV Cost: 63s QPS: 158730  (5.9.2)
+// Blackwidow : Test Set 10000000 KV Cost: 63s QPS: 158730  (5.9.2)
+// Blackwidow : Test Set 10000000 KV Cost: 63s QPS: 158730  (5.9.2)
+// Nemo       : Test Set 10000000 KV Cost: 72s QPS: 138888  (5.0.1)
+// Nemo       : Test Set 10000000 KV Cost: 68s QPS: 147058  (5.0.1)
+// Nemo       : Test Set 10000000 KV Cost: 69s QPS: 144927  (5.0.1)
 //
-// 原因分析 : 可能是Blackwidow用了新版本的Rocksdb, 而新版
-// 本Rocksdb性能有提升导致的
+// Blackwidow : Test Set 10000000 KV Cost: 70s QPS: 142857  (5.7.3)
+// Blackwidow : Test Set 10000000 KV Cost: 68s QPS: 147058  (5.7.3)
+// Blackwidow : Test Set 10000000 KV Cost: 69s QPS: 144927  (5.7.3)
+// Nemo       : Test Set 10000000 KV Cost: 72s QPS: 138888  (5.7.3)
+// Nemo       : Test Set 10000000 KV Cost: 73s QPS: 136986  (5.7.3)
+// Nemo       : Test Set 10000000 KV Cost: 72s QPS: 138888  (5.7.3)
+// 测试场景 : 单线程情况下向存储引擎写入10000000的大小为50字节的键值对
+// 测试结果 : Blackwidow的性能较Nemo有所提升
+//
+// 结果分析 : Blackwidwo采用的是5.9.2版本的Rocksdb, 而Nemo采用的是5.0.1
+// 版本的Rocksdb, 由于Nemo不支持5.9.2版本的Rocksdb, 最高只能支持到5.7.3
+// 版本, 所以我们先把Blackwidow和Nemo都采用5.7.3版本的Rocksdb先进行测试
+// 发现Blackwidow在这种测试场景下性能比Nemo有略微的提升, 原因是Nemo的Set
+// 接口为了其他方法的调用, 多做了一个超时时间的判断, 而Blackwidow没有,
+// 所以这里有略微的性能消耗.
+// 然后我们把Blackwidow的Rocksdb版本切为其的绑定的版本(5.9.2), 也把Nemo
+// 的Rocksdb版本切为其绑定的版本(5.0.1), 这时候发现该场景下Blackwidow的性
+// 能较Nemo有比较大的提升, 这应该是新版的Rocksdb对性能有所优化导致的.
 void BenchSet() {
   printf("====== Set ======\n");
   blackwidow::Options options;
@@ -72,32 +92,44 @@ void BenchSet() {
     printf("Open db failed, error: %s\n", s.ToString().c_str());
     return;
   }
-  std::vector<std::string> keys;
-  std::vector<std::string> values;
+  BlackWidow::KeyValue kv;
+  std::vector<BlackWidow::KeyValue> kvs;
   for (int i = 0; i < TEN_MILLION; i++) {
-    keys.push_back("KEY_" + std::to_string(i));
-    values.push_back("VALUE_" + std::to_string(i));
+    GenerateRandomString(KEY_PREFIX, KEY_SIZE, &kv.key);
+    GenerateRandomString(KEY_PREFIX, VALUE_SIZE, &kv.value);
+    kvs.push_back(kv);
   }
 
   auto start = system_clock::now();
-  for (uint32_t i = 0; i < TEN_MILLION; ++i) {
-    db.Set(keys[i], values[i]);
+  for (const auto& kv : kvs) {
+    db.Set(kv.key, kv.value);
   }
-
   auto end = system_clock::now();
   duration<double> elapsed_seconds = end - start;
   auto cost = duration_cast<std::chrono::seconds>(elapsed_seconds).count();
-  std::cout << "Test Set " << TEN_MILLION << " Cost: " << cost << "s QPS: "
-    << TEN_MILLION / cost << std::endl;
+  std::cout << "Test Set " << kvs.size() << " KV Cost: " << cost << "s QPS: "
+    << kvs.size() / cost << std::endl;
 }
 
-// Blackwidow : Test MultiThread Set 20000000 Cost: 44s QPS: 454545
-// Nemo       : Test MultiThread Set 20000000 Cost: 66s QPS: 303030
-// 测试场景 : 开20个线程向存储引擎中写入总量为20000000的键值对 
+// Blackwidow : Test MultiThread Set 200000000 KV Cost: 542s QPS: 369003  (5.9.2)
+// Blackwidow : Test MultiThread Set 200000000 KV Cost: 537s QPS: 372439  (5.9.2)
+// Blackwidow : Test MultiThread Set 200000000 KV Cost: 545s QPS: 366972  (5.9.2)
+// Nemo       : Test MultiThread Set 200000000 KV Cost: 746s QPS: 268096  (5.0.1)
+// Nemo       : Test MultiThread Set 200000000 KV Cost: 745s QPS: 268456  (5.0.1)
+// Nemo       : Test MultiThread Set 200000000 KV Cost: 754s QPS: 265251  (5.0.1)
+//
+// Blackwidow : Test MultiThread Set 200000000 KV Cost: 775s QPS: 258064  (5.7.3)
+// Blackwidow : Test MultiThread Set 200000000 KV Cost: 765s QPS: 261437  (5.7.3)
+// Blackwidow : Test MultiThread Set 200000000 KV Cost: 779s QPS: 256739  (5.7.3)
+// Nemo       : Test MultiThread Set 200000000 KV Cost: 780s QPS: 256410  (5.7.3)
+// Nemo       : Test MultiThread Set 200000000 KV Cost: 782s QPS: 255754  (5.7.3)
+// Nemo       : Test MultiThread Set 200000000 KV Cost: 783s QPS: 255427  (5.7.3)
+// 测试场景 : 开20个线程向存储引擎中写入总量为20000000的大小为50字节的键值对
 // 测试结果 : Blackwidow的性能明显高于Nemo
 //
-// 原因分析 : 可能是Blackwidow用了新版本的Rocksdb, 而新版本Rocksdb性
-// 能有提升导致的
+// 原因分析 : Blackwidow性能的提升的原因和单线测试所提到的相同, 一方面是Blackwidow
+// 自身的优化, 令一方面是新版Rocksdb性能提升, 在根据以上测试结果发现在多线程情况下
+// 该场景Blackwidow的优势更加明显.
 void BenchMultiThreadSet() {
   printf("====== Multi Thread Set ======\n");
   blackwidow::Options options;
@@ -109,21 +141,23 @@ void BenchMultiThreadSet() {
     printf("Open db failed, error: %s\n", s.ToString().c_str());
     return;
   }
-  std::vector<std::string> keys;
-  std::vector<std::string> values;
-  for (int i = 0; i < ONE_MILLION; i++) {
-    keys.push_back("KEY_" + std::to_string(i));
-    values.push_back("VALUE_" + std::to_string(i));
+
+  BlackWidow::KeyValue kv;
+  std::vector<BlackWidow::KeyValue> kvs;
+  for (int i = 0; i < TEN_MILLION; i++) {
+    GenerateRandomString(KEY_PREFIX, KEY_SIZE, &kv.key);
+    GenerateRandomString(KEY_PREFIX, VALUE_SIZE, &kv.value);
+    kvs.push_back(kv);
   }
 
   std::vector<std::thread> jobs;
   auto start = system_clock::now();
   for (size_t i = 0; i < THREADNUM; ++i) {
-    jobs.emplace_back([&db](std::vector<std::string> keys, std::vector<std::string> values) {
-      for (size_t j = 0; j < ONE_MILLION; ++j) {
-        db.Set(keys[j], values[j]);
+    jobs.emplace_back([&db](std::vector<BlackWidow::KeyValue> kvs) {
+      for (const auto& kv : kvs) {
+        db.Set(kv.key , kv.value);
       }
-    }, keys, values);
+    }, kvs);
   }
   for (auto& job : jobs) {
     job.join();
@@ -131,8 +165,8 @@ void BenchMultiThreadSet() {
   auto end = system_clock::now();
   duration<double> elapsed_seconds = end - start;
   auto cost = duration_cast<std::chrono::seconds>(elapsed_seconds).count();
-  std::cout << "Test MultiThread Set " << THREADNUM * ONE_MILLION << " Cost: "
-    << cost << "s QPS: " << (THREADNUM * ONE_MILLION) / cost << std::endl;
+  std::cout << "Test MultiThread Set " << THREADNUM * kvs.size() << " KV Cost: "
+    << cost << "s QPS: " << (THREADNUM * kvs.size()) / cost << std::endl;
 }
 
 // Blackwidow : Test Scan 10000 Keys Cost: 27ms
@@ -571,8 +605,8 @@ void BenchHGetall() {
 // 结果分析 : Nemo内部EncodeSetKey是向String后面Append内容, 这样可能
 // 会导致重新分配内存, 并且该方法返回的是String对象, 会额外调用一次
 // String的构造函数造成性能消耗.
-// BlackWidow内部一次性分配我们需要拼接Key的空间, 并且返回的是数据内容
-// 的指针, 而不是重新构造这个String对象, 所以性能明显提升.
+// BlackWidow内部一次性分配我们需要拼接Key的空间, 并且返回的是指向数据
+// 内容的指针, 而不是重新构造这个String对象, 所以性能明显提升.
 // 补充说明 : Blackwidow的SAdd接口兼容最新版本的Redis, 一次可以向集合中
 // 添加多个Member, 并且添加的多个Member在Blackwidow中是做一次Bacth的操
 // 作, 所以在一次需要向同一个集合中添加多个Member这种情景下Blackwidow会
@@ -731,7 +765,7 @@ void BenchSMembers() {
 int main() {
   // keys
   //BenchSet();
-  //BenchMultiThreadSet();
+  BenchMultiThreadSet();
   //BenchScan();
   //BenchKeys();
 
@@ -739,7 +773,7 @@ int main() {
   //BenchHSet();
   //BenchHMSet();
   //BenchHDel();
-  BenchHKeys();
+  //BenchHKeys();
   //BenchHGetall();
 
   // sets
