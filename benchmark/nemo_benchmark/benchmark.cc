@@ -6,10 +6,15 @@
 #include <iostream>
 #include <vector>
 #include <thread>
+#include <random>
 #include <functional>
 
 #include "nemo.h"
 
+const int KEY_SIZE = 50;
+const int VALUE_SIZE = 50;
+const int MEMBER_SIZE = 50;
+const int FIELD_SIZE = 50;
 const int THREADNUM = 20;
 const int ONE_THOUSAND = 1000;
 const int TEN_THOUSAND = 10000;
@@ -18,6 +23,35 @@ const int ONE_MILLION = 1000000;
 const int TEN_MILLION = 10000000;
 
 using namespace std::chrono;
+using std::default_random_engine;
+
+static int32_t last_seed = 0;
+
+void GenerateRandomString(std::string& prefix,
+                          int32_t len,
+                          std::string* target) {
+  target->clear();
+  char c_map[67] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'g',
+                    'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
+                    'u', 'v', 'w', 'x', 'y', 'z', 'A', 'B', 'C', 'D',
+                    'E', 'F', 'G', 'H', 'I', 'G', 'K', 'L', 'M', 'N',
+                    'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X',
+                    'Y', 'Z', '~', '!', '@', '#', '$', '%', '^', '&',
+                    '*', '(', ')', '-', '=', '_', '+'};
+
+  if (prefix.size() >= len) {
+    *target = prefix.substr(0, len);
+  } else {
+    *target = prefix;
+    default_random_engine e;
+    for (int i = 0; i < len - prefix.size(); i++) {
+      e.seed(last_seed);
+      last_seed = e();
+      int32_t rand_num = last_seed % 67;
+      target->push_back(c_map[rand_num]);
+    }
+  }
+}
 
 void BenchSet() {
   printf("====== Set ======\n");
@@ -254,6 +288,46 @@ void BenchHDel() {
   delete db;
 }
 
+void BenchHKeys() {
+  printf("====== HKeys ======\n");
+  nemo::Options options;
+  options.create_if_missing = true;
+  nemo::Nemo* db = new nemo::Nemo("./db", options);
+
+  if (!db) {
+    printf("Open db failed\n");
+    return;
+  }
+
+  nemo::FV fv;
+  std::vector<std::string> field;
+  std::vector<nemo::FV> fvs;
+
+  std::string field_prefix = "FIELD_";
+  std::string value_prefix = "VALUE_";
+  for (size_t i = 0; i < TEN_MILLION; ++i) {
+    GenerateRandomString(field_prefix, FIELD_SIZE, &fv.field);
+    GenerateRandomString(value_prefix, VALUE_SIZE, &fv.val);
+    fvs.push_back(fv);
+  }
+
+  db->HMSet("HDEL_KEY", fvs);
+  int64_t count;
+  db->Del("HDEL_KEY", &count);
+
+  fvs.resize(TEN_THOUSAND);
+  db->HMSet("HDEL_KEY", fvs);
+
+  auto start = system_clock::now();
+  db->HKeys("HDEL_KEY", field);
+  auto end = system_clock::now();
+  duration<double> elapsed_seconds = end - start;
+  auto cost = duration_cast<std::chrono::milliseconds>(elapsed_seconds).count();
+  std::cout << "Test HKeys " << field.size() << " Field Hash Table Cost: " << cost
+    << "ms" << std::endl;
+  delete db;
+}
+
 void BenchHGetall() {
   printf("====== HGetall ======\n");
   nemo::Options options;
@@ -450,9 +524,10 @@ int main() {
   //BenchScan();
 
   // hashes
-  BenchHSet();
+  //BenchHSet();
   //BenchHMSet();
   //BenchHDel();
+  BenchHKeys();
   //BenchHGetall();
 
   // sets

@@ -6,10 +6,15 @@
 #include <iostream>
 #include <vector>
 #include <thread>
+#include <random>
 #include <functional>
 
 #include "blackwidow/blackwidow.h"
 
+const int KEY_SIZE = 50;
+const int VALUE_SIZE = 50;
+const int MEMBER_SIZE = 50;
+const int FIELD_SIZE = 50;
 const int THREADNUM = 20;
 const int ONE_THOUSAND = 1000;
 const int TEN_THOUSAND = 10000;
@@ -19,6 +24,35 @@ const int TEN_MILLION = 10000000;
 
 using namespace blackwidow;
 using namespace std::chrono;
+using std::default_random_engine;
+
+static int32_t last_seed = 0;
+
+void GenerateRandomString(std::string& prefix,
+                          int32_t len,
+                          std::string* target) {
+  target->clear();
+  char c_map[67] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'g',
+                    'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
+                    'u', 'v', 'w', 'x', 'y', 'z', 'A', 'B', 'C', 'D',
+                    'E', 'F', 'G', 'H', 'I', 'G', 'K', 'L', 'M', 'N',
+                    'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X',
+                    'Y', 'Z', '~', '!', '@', '#', '$', '%', '^', '&',
+                    '*', '(', ')', '-', '=', '_', '+'};
+
+  if (prefix.size() >= len) {
+    *target = prefix.substr(0, len);
+  } else {
+    *target = prefix;
+    default_random_engine e;
+    for (int i = 0; i < len - prefix.size(); i++) {
+      e.seed(last_seed);
+      last_seed = e();
+      int32_t rand_num = last_seed % 67;
+      target->push_back(c_map[rand_num]);
+    }
+  }
+}
 
 // Blackwidow : Test Set 10000000 Cost: 41s QPS: 250000
 // Nemo       : Test Set 10000000 Cost: 42s QPS: 238095
@@ -379,6 +413,60 @@ void BenchHDel() {
     << " Hash Field Cost: "<< cost << "ms" << std::endl;
 }
 
+// Blackwidow : Test HKeys 10000 Field Hash Table Cost: 3ms
+// Nemo       : Test HKeys 10000 Field Hash Table Cost: 5724ms
+// 测试场景 : 创建一个大的Hash表, 然后删除该Hash表, 再创建一个同名Hash表,
+// 这时候再用新旧引擎进行HKeys对比测试.
+// 测试结果 : Blackwidow性能要明显高于Nemo.
+//
+// 结果分析 : 由于Blackwidow在设计的时候将Version放到了HashKey当中, 由于新
+// 旧Hash表的version不一样, 所以在没有Compaction之前新旧Hash Table的数据在
+// RocksDB中存储的位置也不一样, 我们可以快速的Seek到新的Hash Table的数据块
+// 然后取出来, 并且Blackwidow中不存在没必要的内存分配以及内存拷贝.
+// Nemo中由于没有将Version提前放置, 所以在RocksDB没有做Compaction之前, 新
+// 旧Hash表中的数据混在一起存放, 这时候要从一大堆的数据中筛选出我们想要
+// 的数据, 这个操作是很慢的, 并且Nemo中的Encode*Key()的实现也对性能有所影响,
+// 存在没必要的内存分配已经数据重新拷贝.
+void BenchHKeys() {
+  printf("====== HKeys ======\n");
+  blackwidow::Options options;
+  options.create_if_missing = true;
+  blackwidow::BlackWidow db;
+  blackwidow::Status s = db.Open(options, "./db");
+
+  if (!s.ok()) {
+    printf("Open db failed, error: %s\n", s.ToString().c_str());
+    return;
+  }
+
+  BlackWidow::FieldValue fv;
+  std::vector<std::string> field;
+  std::vector<BlackWidow::FieldValue> fvs;
+
+  std::string field_prefix = "FIELD_";
+  std::string value_prefix = "VALUE_";
+  for (size_t i = 0; i < TEN_MILLION; ++i) {
+    GenerateRandomString(field_prefix, FIELD_SIZE, &fv.field);
+    GenerateRandomString(value_prefix, VALUE_SIZE, &fv.value);
+    fvs.push_back(fv);
+  }
+  std::vector<std::string> del_keys{"HDEL_KEY"};
+  db.HMSet("HDEL_KEY", fvs);
+  std::map<BlackWidow::DataType, Status> type_status;
+  db.Del(del_keys, &type_status);
+
+  fvs.resize(TEN_THOUSAND);
+  db.HMSet("HDEL_KEY", fvs);
+
+  auto start = system_clock::now();
+  db.HKeys("HDEL_KEY", &field);
+  auto end = system_clock::now();
+  duration<double> elapsed_seconds = end - start;
+  auto cost = duration_cast<std::chrono::milliseconds>(elapsed_seconds).count();
+  std::cout << "Test HKeys " << field.size() << " Field Hash Table Cost: " << cost
+    << "ms" << std::endl;
+}
+
 // Case 1
 // Blackwidow : Test case 1, HGetall 100000 Field HashTable Cost: 30ms
 // Nemo       : Test case 1, HGetall 100000 Field HashTable Cost: 57ms
@@ -454,7 +542,7 @@ void BenchHGetall() {
     fvs_in.push_back(fv);
   }
   db.HMSet("HGETALL_KEY2", fvs_in);
-  std::vector<Slice> del_keys({"HGETALL_KEY2"});
+  std::vector<std::string> del_keys({"HGETALL_KEY2"});
   std::map<BlackWidow::DataType, Status> type_status;
   db.Del(del_keys, &type_status);
   fvs_in.clear();
@@ -623,7 +711,7 @@ void BenchSMembers() {
     members_in.push_back("MEMBER_" + std::to_string(i));
   }
   db.SAdd("SMEMBERS_KEY2", members_in, &ret);
-  std::vector<Slice> del_keys({"SMEMBERS_KEY2"});
+  std::vector<std::string> del_keys({"SMEMBERS_KEY2"});
   std::map<BlackWidow::DataType, Status> type_status;
   db.Del(del_keys, &type_status);
   members_in.clear();
@@ -648,9 +736,10 @@ int main() {
   //BenchKeys();
 
   // hashes
-  BenchHSet();
+  //BenchHSet();
   //BenchHMSet();
   //BenchHDel();
+  BenchHKeys();
   //BenchHGetall();
 
   // sets
