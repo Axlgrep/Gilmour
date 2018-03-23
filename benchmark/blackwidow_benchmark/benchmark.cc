@@ -16,6 +16,7 @@ const int VALUE_SIZE = 50;
 const int MEMBER_SIZE = 50;
 const int FIELD_SIZE = 50;
 const int THREADNUM = 20;
+const int ONE_HUNDRED = 100;
 const int ONE_THOUSAND = 1000;
 const int TEN_THOUSAND = 10000;
 const int ONE_HUNDRED_THOUSAND = 100000;
@@ -29,6 +30,8 @@ using std::default_random_engine;
 static int32_t last_seed = 0;
 const std::string KEY_PREFIX = "KEY_";
 const std::string VALUE_PREFIX = "VALUE_";
+const std::string FIELD_PREFIX = "FIELD_";
+const std::string MEMBER_PREFIX = "MEMBER_";
 
 void GenerateRandomString(const std::string& prefix,
                           int32_t len,
@@ -232,8 +235,25 @@ void BenchScan() {
     << " Keys Cost: "<< cost << "ms" << std::endl;
 }
 
+// Blackwidow : Test Keys 3000 Keys Cost: 2ms
+// Blackwidow : Test Keys 3000 Keys Cost: 3ms
+// Blackwidow : Test Keys 3000 Keys Cost: 3ms
+// Nemo       : Test Keys 3000 Keys Cost: 25ms
+// Nemo       : Test Keys 3000 Keys Cost: 32ms
+// Nemo       : Test Keys 3000 Keys Cost: 28ms
+//
+// 测试场景 : 向引擎中写入Hash Table, Sets, Kv数据, 然后遍历出Db中所有的Key.
+// 测试结果 : Blackwidow性能明显优于Nemo
+//
+// 结果分析 : Blackwidow利用了Rocksdb的Column Families新特性, 将Key和数据进行
+// 分组存放, 这样在我们需要Keys*的时候只需要将存储Key对应组里的数据都取出来就
+// 可以了，而Nemo将Key与数据存放在一起, 当我们需要Keys*的时候需要从大量的数据
+// 中筛选出Key, 效率十分低下.
+//
+// 补充说明 : 上面的测试结果是在数据库中存有少量数据的情况下测试的,
+// 如果DB中数据量非常大的情况下, Blackwidow的优势会更加明显.
 void BenchKeys() {
-  printf("====== Scan Keys ======\n");
+  printf("====== Keys * ======\n");
   blackwidow::Options options;
   options.create_if_missing = true;
   blackwidow::BlackWidow db;
@@ -245,21 +265,29 @@ void BenchKeys() {
   }
 
   int32_t ret = 0;
-  BlackWidow::FieldValue fv;
+  std::string member;
   std::vector<std::string> members_in;
+  BlackWidow::FieldValue fv;
   std::vector<BlackWidow::FieldValue> fvs;
   for (size_t i = 0; i < TEN_THOUSAND; ++i) {
-    fv.field = "FIELD_" + std::to_string(i);
-    fv.value = "VALUE_" + std::to_string(i);
+    GenerateRandomString(MEMBER_PREFIX, MEMBER_SIZE, &member);
+    members_in.push_back(member);
+    GenerateRandomString(FIELD_PREFIX, FIELD_SIZE, &fv.field);
+    GenerateRandomString(VALUE_PREFIX, VALUE_SIZE, &fv.value);
     fvs.push_back(fv);
-    members_in.push_back("MEMBER_" + std::to_string(i));
   }
 
-  for (size_t i = 0; i < 5000; ++i) {
-    db.HMSet("KEYS_HASHES_KEY_" + std::to_string(i), fvs);
-    db.SAdd("KEYS_SETS_KEY_" + std::to_string(i), members_in, &ret);
-    db.Set("KEYS_STRING_KEY_" + std::to_string(i), "VALUE");
-    printf("index = %d\n", i);
+  std::string key, value;
+  for (size_t i = 0; i < ONE_THOUSAND; ++i) {
+    GenerateRandomString(KEY_PREFIX, KEY_SIZE, &key);
+    db.SAdd(key, members_in, &ret);
+
+    GenerateRandomString(KEY_PREFIX, KEY_SIZE, &key);
+    db.HMSet(key, fvs);
+
+    GenerateRandomString(KEY_PREFIX, KEY_SIZE, &key);
+    GenerateRandomString(KEY_PREFIX, KEY_SIZE, &value);
+    db.Set(key, value);
   }
 
   int64_t total = 0;
@@ -267,10 +295,10 @@ void BenchKeys() {
   std::vector<std::string> keys;
   auto start = system_clock::now();
   for (; ;) {
-    total += keys.size();
     keys.clear();
     cursor_origin = cursor_ret;
     cursor_ret = db.Scan(cursor_ret, "*", 10, &keys);
+    total += keys.size();
     if (cursor_ret == 0) {
       break;
     }
@@ -652,6 +680,148 @@ void BenchSAdd() {
     << "s QPS:" << (THREADNUM * TEN_THOUSAND) / cost << std::endl;
 }
 
+// Blackwidow : Test SRem 200000 Sets Cost: 134s QPS:1492  (5.9.2)
+// Blackwidow : Test SRem 200000 Sets Cost: 134s QPS:1492  (5.9.2)
+// Blackwidow : Test SRem 200000 Sets Cost: 137s QPS:1459  (5.9.2)
+// Nemo       : Test SRem 200000 Sets Cost: 182s QPS:1098  (5.0.1)
+// Nemo       : Test SRem 200000 Sets Cost: 179s QPS:1117  (5.0.1)
+// Nemo       : Test SRem 200000 Sets Cost: 179s QPS:1117  (5.0.1)
+// 测试场景 : 向引擎中写入200000个大小为100的Sets, 然后开20条线程删除这些
+// Sets的所有Member
+// 测试结果 : Blackwidow的性能略微高于Nemo
+//
+// 结果分析 : Nemo内部EncodeSetKey是向String后面Append内容, 这样可能
+// 会导致重新分配内存, 并且该方法返回的是String对象, 会额外调用一次
+// String的构造函数造成性能消耗.
+// BlackWidow内部一次性分配我们需要拼接Key的空间, 并且返回的是指向数据
+// 内容的指针, 而不是重新构造这个String对象, 所以性能明显提升.
+// 补充说明 : Blackwidow的SRem接口兼容最新版本的Redis, 一次可以向集合中
+// 删除多个Member, 并且删除的多个Member在Blackwidow中是做一次Bacth的操
+// 作, 所以在一次需要在同一个集合中删除多个Member这种情景下Blackwidow会
+// 明显优于Nemo.
+void BenchSRem() {
+  printf("====== SRem ======\n");
+  blackwidow::Options options;
+  options.create_if_missing = true;
+  blackwidow::BlackWidow db;
+  blackwidow::Status s = db.Open(options, "./db");
+
+  if (!s.ok()) {
+    printf("Open db failed, error: %s\n", s.ToString().c_str());
+    return;
+  }
+
+  int32_t ret;
+  std::string set_key, member;
+  std::vector<std::string> keys;
+  std::vector<std::vector<std::string>> sets(TEN_THOUSAND * THREADNUM);
+  for (int i = 0; i < TEN_THOUSAND * THREADNUM; i++) {
+    GenerateRandomString(KEY_PREFIX, KEY_SIZE, &set_key);
+    keys.push_back(set_key);
+    for (int j = 0; j < ONE_HUNDRED; j++) {
+      GenerateRandomString(MEMBER_PREFIX, MEMBER_SIZE, &member);
+      sets[i].push_back(member);
+    }
+    db.SAdd(set_key, sets[i], &ret);
+  }
+
+  std::vector<std::thread> jobs;
+  auto start = system_clock::now();
+  for (size_t i = 0; i < THREADNUM; ++i) {
+    jobs.emplace_back([&db](size_t index,
+                            std::vector<std::string> keys,
+                            std::vector<std::vector<std::string>> sets) {
+      int32_t ret;
+      for (int j = 0; j < TEN_THOUSAND; j++) {
+        std::string key = keys[index * TEN_THOUSAND + j];
+        for (const auto& member : sets[index * TEN_THOUSAND + j]) {
+          db.SRem(key, {member}, &ret);
+        }
+      }
+    }, i, keys, sets);
+  }
+  for (auto& job : jobs) {
+    job.join();
+  }
+  auto end = system_clock::now();
+  duration<double> elapsed_seconds = end - start;
+  auto cost = duration_cast<std::chrono::seconds>(elapsed_seconds).count();
+  std::cout << "Test SRem " << (THREADNUM * TEN_THOUSAND) << " Sets Cost: " << cost
+    << "s QPS:" << (THREADNUM * TEN_THOUSAND) / cost << std::endl;
+}
+
+// Blackwidow : Test SMove 200000 Sets Cost: 248s QPS:806
+// Blackwidow : Test SMove 200000 Sets Cost: 255s QPS:784
+// Blackwidow : Test SMove 200000 Sets Cost: 253s QPS:790
+// Nemo       : Test SMove 200000 Sets Cost: 450s QPS:444
+// Nemo       : Test SMove 200000 Sets Cost: 457s QPS:437
+// Nemo       : Test SMove 200000 Sets Cost: 457s QPS:437
+// 测试场景 : 创建200000个Sets集合，然后起20条线程将这个200000个Sets进行Move操作
+// 测试结果 : Blackwidow的性能明显高于Nemo
+//
+// 结果分析 : Nemo内部EncodeSetKey是向String后面Append内容, 这样可能
+// 会导致重新分配内存, 并且该方法返回的是String对象, 会额外调用一次
+// String的构造函数造成性能消耗, 并且Nemo还会调用WriteWithOldKeyTTL()
+// 方法重新将超时时间Encode进去, 效率较低.
+// BlackWidow内部一次性分配我们需要拼接Key的空间, 并且返回的是指向数据
+// 内容的指针, 而不是重新构造这个String对象, 所以性能明显提升.
+void BenchSMove() {
+  printf("====== SMove ======\n");
+  blackwidow::Options options;
+  options.create_if_missing = true;
+  blackwidow::BlackWidow db;
+  blackwidow::Status s = db.Open(options, "./db");
+
+  if (!s.ok()) {
+    printf("Open db failed, error: %s\n", s.ToString().c_str());
+    return;
+  }
+
+  int32_t ret;
+  std::string set_key, member;
+  std::vector<std::string> keys_source;
+  std::vector<std::string> keys_destination;
+  std::vector<std::vector<std::string>> sets(TEN_THOUSAND * THREADNUM);
+  for (int i = 0; i < TEN_THOUSAND * THREADNUM; i++) {
+    GenerateRandomString(KEY_PREFIX + "sou_", KEY_SIZE, &set_key);
+    keys_source.push_back(set_key);
+    for (int j = 0; j < ONE_HUNDRED; j++) {
+      GenerateRandomString(MEMBER_PREFIX, MEMBER_SIZE, &member);
+      sets[i].push_back(member);
+    }
+    db.SAdd(set_key, sets[i], &ret);
+
+    GenerateRandomString(KEY_PREFIX + "des_", KEY_SIZE, &set_key);
+    keys_destination.push_back(set_key);
+  }
+
+  std::vector<std::thread> jobs;
+  auto start = system_clock::now();
+  for (size_t i = 0; i < THREADNUM; ++i) {
+    jobs.emplace_back([&db](size_t index,
+                            std::vector<std::string> keys_source,
+                            std::vector<std::string> keys_destination,
+                            std::vector<std::vector<std::string>> sets) {
+      int32_t ret;
+      for (int j = 0; j < TEN_THOUSAND; j++) {
+        std::string source = keys_source[index * TEN_THOUSAND + j];
+        std::string destination = keys_destination[index * TEN_THOUSAND + j];
+        for (const auto& member : sets[index * TEN_THOUSAND + j]) {
+          db.SMove(source, destination, member, &ret);
+        }
+      }
+    }, i, keys_source, keys_destination, sets);
+  }
+  for (auto& job : jobs) {
+    job.join();
+  }
+  auto end = system_clock::now();
+  duration<double> elapsed_seconds = end - start;
+  auto cost = duration_cast<std::chrono::seconds>(elapsed_seconds).count();
+  std::cout << "Test SMove " << (THREADNUM * TEN_THOUSAND) << " Sets Cost: " << cost
+    << "s QPS:" << (THREADNUM * TEN_THOUSAND) / cost << std::endl;
+}
+
 void BenchSPop() {
   printf("====== SPop ======\n");
   blackwidow::Options options;
@@ -765,9 +935,9 @@ void BenchSMembers() {
 int main() {
   // keys
   //BenchSet();
-  BenchMultiThreadSet();
+  //BenchMultiThreadSet();
   //BenchScan();
-  //BenchKeys();
+  BenchKeys();
 
   // hashes
   //BenchHSet();
@@ -778,6 +948,8 @@ int main() {
 
   // sets
   //BenchSAdd();
+  //BenchSRem();
+  //BenchSMove();
   //BenchSPop();
   //BenchSMembers();
 }
