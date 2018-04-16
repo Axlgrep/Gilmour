@@ -696,6 +696,65 @@ void BenchSMembers() {
   delete db;
 }
 
+void BenchLRange() {
+	printf("====== LRange ======\n");
+	nemo::Options options;
+	options.create_if_missing = true;
+	nemo::Nemo* db = new nemo::Nemo("./db", options);
+
+	if (!db) {
+		printf("Open db failed\n");
+		return;
+	}
+	std::vector<std::string> values;
+	for (int i = 0; i < 10 * TEN_MILLION; i++) {
+		std::string value;
+		GenerateRandomString(VALUE_PREFIX, KEY_SIZE, &value);
+		values.push_back(value);
+	}
+	int64_t num;
+	for (auto v : values) {
+		db->RPush("BENCHMARK_LRANGE", v, &num);
+	}
+	std::vector<nemo::IV> result;
+
+	// 100000
+	auto start = system_clock::now();
+	db->LRange("BENCHMARK_LRANGE", 0, ONE_HUNDRED_THOUSAND, result);
+	auto end = system_clock::now();
+	duration<double> elapsed_seconds = end - start;
+	auto cost = duration_cast<std::chrono::seconds>(elapsed_seconds).count();
+	std::cout << "Test LRange " << ONE_HUNDRED_THOUSAND << " KV Cost: " << cost << "s QPS: "
+		<< ONE_HUNDRED_THOUSAND / cost << std::endl;
+
+	// 1000000
+	start = system_clock::now();
+	db->LRange("BENCHMARK_LRANGE", 0, ONE_MILLION, result);
+	end = system_clock::now();
+	elapsed_seconds = end - start;
+	cost = duration_cast<std::chrono::seconds>(elapsed_seconds).count();
+	std::cout << "Test LRange " << ONE_MILLION << " KV Cost: " << cost << "s QPS: "
+		<< ONE_MILLION / cost << std::endl;
+
+	// 10000000
+	start = system_clock::now();
+	db->LRange("BENCHMARK_LRANGE", 0, TEN_MILLION, result);
+	end = system_clock::now();
+	elapsed_seconds = end - start;
+	cost = duration_cast<std::chrono::seconds>(elapsed_seconds).count();
+	std::cout << "Test LRange " << TEN_MILLION << " KV Cost: " << cost << "s QPS: "
+		<< TEN_MILLION / cost << std::endl;
+
+	// 10 * 10000000
+	start = system_clock::now();
+	db->LRange("BENCHMARK_LRANGE", 0, 10 * TEN_MILLION, result);
+	end = system_clock::now();
+	elapsed_seconds = end - start;
+	cost = duration_cast<std::chrono::seconds>(elapsed_seconds).count();
+	std::cout << "Test LRange " << 10 * TEN_MILLION << " KV Cost: " << cost << "s QPS: "
+		<< 10 * TEN_MILLION / cost << std::endl;
+}
+
 int main() {
   // keys
   //BenchSet();

@@ -932,6 +932,72 @@ void BenchSMembers() {
   std::cout << "Test Case 2, SMembers " << members_out.size() << " Cost: " << cost << "ms" << std::endl;
 }
 
+void BenchLRange() {
+	printf("====== LRange ======\n");
+	blackwidow::Options options;
+	options.create_if_missing = true;
+	blackwidow::BlackWidow db;
+	blackwidow::Status s = db.Open(options, "./db");
+
+	if (!s.ok()) {
+		printf("Open db failed, error: %s\n", s.ToString().c_str());
+		return;
+	}
+	std::vector<std::string> values;
+	for (int i = 0; i < 10 * TEN_MILLION; i++) {
+		std::string value;
+		GenerateRandomString(VALUE_PREFIX, KEY_SIZE, &value);
+		values.push_back(value);
+	}
+	uint64_t num;
+	db.RPush("BENCHMARK_LRANGE", values, &num);
+	std::vector<std::string> result;
+
+	// 100000
+	auto start = system_clock::now();
+	db.LRange("BENCHMARK_LRANGE", 0, ONE_HUNDRED_THOUSAND, &result);
+	std::cout << result.size() << std::endl;
+	result.clear();
+	auto end = system_clock::now();
+	duration<double> elapsed_seconds = end - start;
+	auto cost = duration_cast<std::chrono::milliseconds>(elapsed_seconds).count();
+	std::cout << "Test LRange " << ONE_HUNDRED_THOUSAND << " KV Cost: " << static_cast<double>(cost / 1000) << "s QPS: "
+		<<  ONE_HUNDRED_THOUSAND / cost * 1000 << std::endl;
+
+	// 1000000
+	start = system_clock::now();
+	db.LRange("BENCHMARK_LRANGE", 0, ONE_MILLION, &result);
+	std::cout << result.size() << std::endl;
+	result.clear();
+	end = system_clock::now();
+	elapsed_seconds = end - start;
+	cost = duration_cast<std::chrono::milliseconds>(elapsed_seconds).count();
+	std::cout << "Test LRange " << ONE_MILLION << " KV Cost: " << static_cast<double>(cost / 1000) << "s QPS: "
+		<<  ONE_MILLION / cost * 1000 << std::endl;
+
+	// 10000000
+	start = system_clock::now();
+	db.LRange("BENCHMARK_LRANGE", 0, TEN_MILLION, &result);
+	std::cout << result.size() << std::endl;
+	result.clear();
+	end = system_clock::now();
+	elapsed_seconds = end - start;
+	cost = duration_cast<std::chrono::milliseconds>(elapsed_seconds).count();
+	std::cout << "Test LRange " << TEN_MILLION << " KV Cost: " << static_cast<double>(cost / 1000) << "s QPS: "
+		<<  TEN_MILLION / cost * 1000 << std::endl;
+
+	// 10 * 10000000
+	start = system_clock::now();
+	db.LRange("BENCHMARK_LRANGE", 0, 10 * TEN_MILLION, &result);
+	std::cout << result.size() << std::endl;
+	result.clear();
+	end = system_clock::now();
+	elapsed_seconds = end - start;
+	cost = duration_cast<std::chrono::milliseconds>(elapsed_seconds).count();
+	std::cout << "Test LRange " << 10 * TEN_MILLION << " KV Cost: " << static_cast<double>(cost / 1000) << "s QPS: "
+		<<  10 * TEN_MILLION / cost * 1000 << std::endl;
+}
+
 int main() {
   // keys
   //BenchSet();
