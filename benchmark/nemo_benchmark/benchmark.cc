@@ -723,36 +723,32 @@ void BenchLRange() {
   db->LRange("BENCHMARK_LRANGE", 0, ONE_HUNDRED_THOUSAND, result);
   auto end = system_clock::now();
   duration<double> elapsed_seconds = end - start;
-  auto cost = duration_cast<std::chrono::seconds>(elapsed_seconds).count();
-  std::cout << "Test LRange " << ONE_HUNDRED_THOUSAND << " KV Cost: " << cost << "s QPS: "
-    << ONE_HUNDRED_THOUSAND / cost << std::endl;
+  auto cost = duration_cast<std::chrono::milliseconds>(elapsed_seconds).count();
+  std::cout << "Test LRange " << ONE_HUNDRED_THOUSAND << "  interval Cost: " << cost << "ms" << std::endl;
 
   // 1000000
   start = system_clock::now();
   db->LRange("BENCHMARK_LRANGE", 0, ONE_MILLION, result);
   end = system_clock::now();
   elapsed_seconds = end - start;
-  cost = duration_cast<std::chrono::seconds>(elapsed_seconds).count();
-  std::cout << "Test LRange " << ONE_MILLION << " KV Cost: " << cost << "s QPS: "
-    << ONE_MILLION / cost << std::endl;
+  cost = duration_cast<std::chrono::milliseconds>(elapsed_seconds).count();
+  std::cout << "Test LRange " << ONE_MILLION << " interval Cost: " << cost << "ms" << std::endl;
 
   // 10000000
   start = system_clock::now();
   db->LRange("BENCHMARK_LRANGE", 0, TEN_MILLION, result);
   end = system_clock::now();
   elapsed_seconds = end - start;
-  cost = duration_cast<std::chrono::seconds>(elapsed_seconds).count();
-  std::cout << "Test LRange " << TEN_MILLION << " KV Cost: " << cost << "s QPS: "
-    << TEN_MILLION / cost << std::endl;
+  cost = duration_cast<std::chrono::milliseconds>(elapsed_seconds).count();
+  std::cout << "Test LRange " << TEN_MILLION << " interval Cost: " << cost << "ms" << std::endl;
 
   // 10 * 10000000
   start = system_clock::now();
   db->LRange("BENCHMARK_LRANGE", 0, 10 * TEN_MILLION, result);
   end = system_clock::now();
   elapsed_seconds = end - start;
-  cost = duration_cast<std::chrono::seconds>(elapsed_seconds).count();
-  std::cout << "Test LRange " << 10 * TEN_MILLION << " KV Cost: " << cost << "s QPS: "
-    << 10 * TEN_MILLION / cost << std::endl;
+  cost = duration_cast<std::chrono::milliseconds>(elapsed_seconds).count();
+  std::cout << "Test LRange " << 10 * TEN_MILLION << " interval Cost: " << cost << "ms" << std::endl;
 }
 
 static void usage() {
