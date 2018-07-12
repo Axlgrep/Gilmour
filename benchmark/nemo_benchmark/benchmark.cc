@@ -755,27 +755,48 @@ void BenchLRange() {
     << 10 * TEN_MILLION / cost << std::endl;
 }
 
-int main() {
-  // keys
-  //BenchSet();
-  //BenchMultiThreadSet();
-  //BenchScan();
-  //BenchKeys();
+static void usage() {
+  std::cout << "Usage: " << std::endl;
+  std::cout << "      ./benchmark_nemo [Set|MultiThreadSet|Scan|Keys|HSet|HMSet|HDel|HKeys|HGetall|SAdd|SRem|SMove|SMembers|LRange]\n";
+}
 
-  // hashes
-  //BenchHSet();
-  //BenchHMSet();
-  //BenchHDel();
-  //BenchHKeys();
-  //BenchHGetall();
+int main(int argc, char *argv[]) {
+  if (argc != 2) {
+    usage();
+    exit(-1);
+  }
+  std::string interface = std::string(argv[1]);
 
-  // sets
-  //BenchSAdd();
-  //BenchSRem();
-  //BenchSMove();
-  //BenchSPop();
-  //BenchSMembers();
-
-  // list
-  BenchLRange();
+  if (interface == "Set") {
+    BenchSet();
+  } else if (interface == "MultiThreadSet") {
+    BenchMultiThreadSet();
+  } else if (interface == "Scan") {
+    BenchScan();
+  } else if (interface == "Keys") {
+    BenchKeys();
+  } else if (interface == "HSet") {
+    BenchHSet();
+  } else if (interface == "HMSet") {
+    BenchHMSet();
+  } else if (interface == "HDel") {
+    BenchHDel();
+  } else if (interface == "HKeys") {
+    BenchHKeys();
+  } else if (interface == "HGetall") {
+    BenchHGetall();
+  } else if (interface == "SAdd") {
+    BenchSAdd();
+  } else if (interface == "SRem") {
+    BenchSRem();
+  } else if (interface == "SMove") {
+    BenchSMove();
+  } else if (interface == "SMembers") {
+    BenchSMembers();
+  } else if (interface == "LRange") {
+    BenchLRange();
+  } else {
+    usage();
+  }
+  return 0;
 }
