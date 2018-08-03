@@ -16,3 +16,6 @@
 [submodule "benchmark/nemo_benchmark/deps/nemo-rocksdb"]
 	path = benchmark/nemo_benchmark/deps/nemo-rocksdb
 	url = https://github.com/Qihoo360/nemo-rocksdb.git
+[submodule "benchmark/blackwidow_benchmark/deps/slash"]
+	path = benchmark/blackwidow_benchmark/deps/slash
+	url = https://github.com/Qihoo360/slash.git

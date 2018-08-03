@@ -95,8 +95,8 @@ void BenchSet() {
     printf("Open db failed, error: %s\n", s.ToString().c_str());
     return;
   }
-  BlackWidow::KeyValue kv;
-  std::vector<BlackWidow::KeyValue> kvs;
+  blackwidow::KeyValue kv;
+  std::vector<blackwidow::KeyValue> kvs;
   for (int i = 0; i < TEN_MILLION; i++) {
     GenerateRandomString(KEY_PREFIX, KEY_SIZE, &kv.key);
     GenerateRandomString(KEY_PREFIX, VALUE_SIZE, &kv.value);
@@ -145,8 +145,8 @@ void BenchMultiThreadSet() {
     return;
   }
 
-  BlackWidow::KeyValue kv;
-  std::vector<BlackWidow::KeyValue> kvs;
+  blackwidow::KeyValue kv;
+  std::vector<blackwidow::KeyValue> kvs;
   for (int i = 0; i < TEN_MILLION; i++) {
     GenerateRandomString(KEY_PREFIX, KEY_SIZE, &kv.key);
     GenerateRandomString(KEY_PREFIX, VALUE_SIZE, &kv.value);
@@ -156,7 +156,7 @@ void BenchMultiThreadSet() {
   std::vector<std::thread> jobs;
   auto start = system_clock::now();
   for (size_t i = 0; i < THREADNUM; ++i) {
-    jobs.emplace_back([&db](std::vector<BlackWidow::KeyValue> kvs) {
+    jobs.emplace_back([&db](std::vector<blackwidow::KeyValue> kvs) {
       for (const auto& kv : kvs) {
         db.Set(kv.key , kv.value);
       }
@@ -203,8 +203,8 @@ void BenchScan() {
   }
 
   int32_t ret = 0;
-  BlackWidow::FieldValue fv;
-  std::vector<BlackWidow::FieldValue> fvs;
+  blackwidow::FieldValue fv;
+  std::vector<blackwidow::FieldValue> fvs;
 
   for (size_t i = 0; i < TEN_THOUSAND; ++i) {
     fv.field = "FIELD_" + std::to_string(i);
@@ -267,8 +267,8 @@ void BenchKeys() {
   int32_t ret = 0;
   std::string member;
   std::vector<std::string> members_in;
-  BlackWidow::FieldValue fv;
-  std::vector<BlackWidow::FieldValue> fvs;
+  blackwidow::FieldValue fv;
+  std::vector<blackwidow::FieldValue> fvs;
   for (size_t i = 0; i < TEN_THOUSAND; ++i) {
     GenerateRandomString(MEMBER_PREFIX, MEMBER_SIZE, &member);
     members_in.push_back(member);
@@ -334,8 +334,8 @@ void BenchHSet() {
     return;
   }
 
-  BlackWidow::FieldValue fv;
-  std::vector<BlackWidow::FieldValue> fvs;
+  blackwidow::FieldValue fv;
+  std::vector<blackwidow::FieldValue> fvs;
   for (size_t i = 0; i < 100; ++i) {
     fv.field = "FIELD_" + std::to_string(i);
     fv.value = "VALUE_" + std::to_string(i);
@@ -345,7 +345,7 @@ void BenchHSet() {
   std::vector<std::thread> jobs;
   auto start = system_clock::now();
   for (size_t i = 0; i < THREADNUM; ++i) {
-    jobs.emplace_back([&db](size_t index, std::vector<BlackWidow::FieldValue> fvs) {
+    jobs.emplace_back([&db](size_t index, std::vector<blackwidow::FieldValue> fvs) {
       for (size_t j = 0; j < TEN_THOUSAND ; ++j) {
         int32_t ret;
         std::string cur_key = "KEYS_HSET_" + std::to_string(index * TEN_THOUSAND + j);
@@ -389,8 +389,8 @@ void BenchHMSet() {
     return;
   }
 
-  BlackWidow::FieldValue fv;
-  std::vector<BlackWidow::FieldValue> fvs;
+  blackwidow::FieldValue fv;
+  std::vector<blackwidow::FieldValue> fvs;
   for (size_t i = 0; i < 100; ++i) {
     fv.field = "FIELD_" + std::to_string(i);
     fv.value = "VALUE_" + std::to_string(i);
@@ -400,7 +400,7 @@ void BenchHMSet() {
   std::vector<std::thread> jobs;
   auto start = system_clock::now();
   for (size_t i = 0; i < THREADNUM; ++i) {
-    jobs.emplace_back([&db](size_t index, std::vector<BlackWidow::FieldValue> fvs) {
+    jobs.emplace_back([&db](size_t index, std::vector<blackwidow::FieldValue> fvs) {
       for (size_t j = 0; j < TEN_THOUSAND ; ++j) {
         db.HMSet("KEYS_HMSET_" + std::to_string(index * TEN_THOUSAND + j), fvs);
       }
@@ -451,9 +451,9 @@ void BenchHDel() {
   }
 
   int32_t ret = 0;
-  BlackWidow::FieldValue fv;
+  blackwidow::FieldValue fv;
   std::vector<std::string> fields;
-  std::vector<BlackWidow::FieldValue> fvs;
+  std::vector<blackwidow::FieldValue> fvs;
 
   fvs.clear();
   for (size_t i = 0; i < TEN_MILLION; ++i) {
@@ -501,9 +501,9 @@ void BenchHKeys() {
     return;
   }
 
-  BlackWidow::FieldValue fv;
+  blackwidow::FieldValue fv;
   std::vector<std::string> field;
-  std::vector<BlackWidow::FieldValue> fvs;
+  std::vector<blackwidow::FieldValue> fvs;
 
   std::string field_prefix = "FIELD_";
   std::string value_prefix = "VALUE_";
@@ -514,7 +514,7 @@ void BenchHKeys() {
   }
   std::vector<std::string> del_keys{"HDEL_KEY"};
   db.HMSet("HDEL_KEY", fvs);
-  std::map<BlackWidow::DataType, Status> type_status;
+  std::map<blackwidow::DataType, Status> type_status;
   db.Del(del_keys, &type_status);
 
   fvs.resize(TEN_THOUSAND);
@@ -566,10 +566,10 @@ void BenchHGetall() {
   }
 
   int32_t ret = 0;
-  BlackWidow::FieldValue fv;
+  blackwidow::FieldValue fv;
   std::vector<std::string> fields;
-  std::vector<BlackWidow::FieldValue> fvs_in;
-  std::vector<BlackWidow::FieldValue> fvs_out;
+  std::vector<blackwidow::FieldValue> fvs_in;
+  std::vector<blackwidow::FieldValue> fvs_out;
 
   // 1. Create the hash table then insert hash table 100000 field
   // 2. HGetall the hash table 100000 field (statistics cost time)
@@ -605,7 +605,7 @@ void BenchHGetall() {
   }
   db.HMSet("HGETALL_KEY2", fvs_in);
   std::vector<std::string> del_keys({"HGETALL_KEY2"});
-  std::map<BlackWidow::DataType, Status> type_status;
+  std::map<blackwidow::DataType, Status> type_status;
   db.Del(del_keys, &type_status);
   fvs_in.clear();
   for (size_t i = 0; i < TEN_THOUSAND; ++i) {
@@ -844,7 +844,7 @@ void BenchSPop() {
 
   auto start = system_clock::now();
   for (uint32_t i = 0; i < ONE_HUNDRED_THOUSAND; ++i) {
-    db.SPop("SPOP_KEY", i, &members_out);
+    //db.SPop("SPOP_KEY", i, &members_out);
   }
   auto end = system_clock::now();
   duration<double> elapsed_seconds = end - start;
@@ -916,7 +916,7 @@ void BenchSMembers() {
   }
   db.SAdd("SMEMBERS_KEY2", members_in, &ret);
   std::vector<std::string> del_keys({"SMEMBERS_KEY2"});
-  std::map<BlackWidow::DataType, Status> type_status;
+  std::map<blackwidow::DataType, Status> type_status;
   db.Del(del_keys, &type_status);
   members_in.clear();
   for (size_t i = 0; i < ONE_HUNDRED_THOUSAND; ++i) {

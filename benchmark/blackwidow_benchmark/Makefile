@@ -9,32 +9,44 @@ ROCKSDB_PATH=$(DEPS_PATH)/rocksdb
 endif
 ROCKSDB=$(ROCKSDB_PATH)/librocksdb.a
 
+ifndef SLASH_PATH
+SLASH_PATH=$(DEPS_PATH)/slash
+endif
+SLASH=$(SLASH_PATH)/slash/lib/libslash.a
+
 ifndef BLACKWIDOW_PATH
 BLACKWIDOW_PATH=$(DEPS_PATH)/blackwidow
 endif
 BLACKWIDOW=$(BLACKWIDOW_PATH)/lib/libblackwidow.a
 
+
 INCLUDE_PATH = -I./include                    \
                -I$(BLACKWIDOW_PATH)/include   \
                -I$(ROCKSDB_PATH)/include      \
+               -I$(SLASH_PATH)/               \
 
 LIB_PATH     = -L$(BLACKWIDOW_PATH)/lib       \
                -L$(ROCKSDB_PATH)/             \
+               -L$(SLASH_PATH)/slash/lib      \
 
 LIBS         = -lblackwidow                   \
                -lrocksdb                      \
+               -lslash                        \
 
 .PHONY: clean all
 
-OBJECTS= $(BLACKWIDOW) $(ROCKSDB) benchmark
+OBJECTS= $(BLACKWIDOW) $(ROCKSDB) $(SLASH) benchmark
 
 all: $(OBJECTS)
 
 $(BLACKWIDOW):
-	make -C $(BLACKWIDOW_PATH) ROCKSDB_PATH=../rocksdb
+	make -C $(BLACKWIDOW_PATH) ROCKSDB_PATH=../rocksdb SLASH_PATH=../slash
 
 $(ROCKSDB):
 	make -C $(ROCKSDB_PATH) static_lib -j 24
+
+$(SLASH):
+	make -C $(SLASH_PATH)/slash
 
 benchmark: benchmark.cc
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(INCLUDE_PATH) $(LIB_PATH) $(LDFLAGS) $(LIBS)
@@ -48,3 +60,4 @@ distclean:
 	rm -rf benchmark
 	make -C $(BLACKWIDOW_PATH) clean
 	make -C $(ROCKSDB_PATH) clean
+	make -C $(SLASH_PATH)/slash clean
