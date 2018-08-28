@@ -16,12 +16,16 @@ const int VALUE_SIZE = 50;
 const int MEMBER_SIZE = 50;
 const int FIELD_SIZE = 50;
 const int THREADNUM = 20;
+const int THREADNUM_SIX = 6;
 const int ONE_HUNDRED = 100;
 const int ONE_THOUSAND = 1000;
 const int TEN_THOUSAND = 10000;
 const int ONE_HUNDRED_THOUSAND = 100000;
 const int ONE_MILLION = 1000000;
 const int TEN_MILLION = 10000000;
+const int BATCH_LIMIT_TEM = 10;
+const int BATCH_LIMIT_ONE_HUNDRED = 100;
+const int BATCH_LIMIT_ONE_THOUSAND = 1000;
 
 using namespace blackwidow;
 using namespace std::chrono;
@@ -990,6 +994,140 @@ void BenchLRange() {
   std::cout << "Test LRange " << 10 * TEN_MILLION << " interval Cost: " << cost << "ms" << std::endl;
 }
 
+void BenchZAdd() {
+  printf("====== ZAdd ======\n");
+  blackwidow::Options options;
+  options.create_if_missing = true;
+  rocksdb::Status s;
+
+  blackwidow::ScoreMember sm;
+  std::vector<blackwidow::ScoreMember> sms;
+  for (int i = 0; i < TEN_MILLION; i++) {
+    sm.score = i;
+    GenerateRandomString(MEMBER_PREFIX, MEMBER_SIZE, &sm.member);
+    sms.push_back(sm);
+  }
+
+  // Test Case 1, Don't do batch
+  blackwidow::BlackWidow test1_db;
+  s = test1_db.Open(options, "./db_zadd_test1");
+  if (!s.ok()) {
+    printf("Open test1 db failed, error: %s\n", s.ToString().c_str());
+    return;
+  }
+  std::vector<std::thread> test1_jobs;
+  auto test1_start = system_clock::now();
+  for (size_t i = 0; i < THREADNUM_SIX; ++i) {
+    test1_jobs.emplace_back([&test1_db](std::vector<blackwidow::ScoreMember> sms) {
+      size_t idx;
+      int32_t ret = 0;
+      std::vector<blackwidow::ScoreMember> sub_sms;
+      for (idx = 0; idx + BATCH_LIMIT_TEM < sms.size(); idx += BATCH_LIMIT_TEM) {
+        for (size_t offset = 0; offset < BATCH_LIMIT_TEM; ++offset) {
+          sub_sms.push_back(sms[idx + offset]);
+        }
+        rocksdb::Status s = test1_db.ZAdd("ZADD_KEY_1", sub_sms, &ret);
+        sub_sms.clear();
+      }
+
+      if (idx < sms.size()) {
+        for (size_t sidx = idx; sidx < sms.size(); ++sidx) {
+          sub_sms.push_back(sms[sidx]);
+        }
+        test1_db.ZAdd("ZADD_KEY_1", sub_sms, &ret);
+      }
+    }, sms);
+  }
+  for (auto& job : test1_jobs) {
+    job.join();
+  }
+
+  auto test1_end = system_clock::now();
+  duration<double> test1_elapsed_seconds = test1_end - test1_start;
+  auto test1_cost = duration_cast<std::chrono::milliseconds>(test1_elapsed_seconds).count();
+  std::cout << "Test case 1, MultiThread ZAdd " << THREADNUM_SIX * sms.size() << " Score Member Cost: " << test1_cost << "ms" << std::endl;
+
+
+  // Test Case 2, Make batch in groups of ten
+  blackwidow::BlackWidow test2_db;
+  s = test2_db.Open(options, "./db_zadd_test2");
+  if (!s.ok()) {
+    printf("Open test2 db failed, error: %s\n", s.ToString().c_str());
+    return;
+  }
+  std::vector<std::thread> test2_jobs;
+  auto test2_start = system_clock::now();
+  for (size_t i = 0; i < THREADNUM_SIX; ++i) {
+    test2_jobs.emplace_back([&test2_db](std::vector<blackwidow::ScoreMember> sms) {
+      size_t idx;
+      int32_t ret = 0;
+      std::vector<blackwidow::ScoreMember> sub_sms;
+      for (idx = 0; idx + BATCH_LIMIT_ONE_HUNDRED < sms.size(); idx += BATCH_LIMIT_ONE_HUNDRED) {
+        for (size_t offset = 0; offset < BATCH_LIMIT_ONE_HUNDRED; ++offset) {
+          sub_sms.push_back(sms[idx + offset]);
+        }
+        test2_db.ZAdd("ZADD_KEY_2", sub_sms, &ret);
+        sub_sms.clear();
+      }
+
+      if (idx < sms.size()) {
+        for (size_t sidx = idx; sidx < sms.size(); ++sidx) {
+          sub_sms.push_back(sms[sidx]);
+        }
+        test2_db.ZAdd("ZADD_KEY_2", sub_sms, &ret);
+      }
+    }, sms);
+  }
+  for (auto& job : test2_jobs) {
+    job.join();
+  }
+
+  auto test2_end = system_clock::now();
+  duration<double> test2_elapsed_seconds = test2_end - test2_start;
+  auto test2_cost = duration_cast<std::chrono::milliseconds>(test2_elapsed_seconds).count();
+  std::cout << "Test case 2, MultiThread ZAdd " << THREADNUM_SIX * sms.size() << " Score Member Cost: " << test2_cost << "ms" << std::endl;
+
+
+  // Test Case 3, Make batch in groups of one hundred
+  blackwidow::BlackWidow test3_db;
+  test3_db.Open(options, "./db_zadd_test3");
+  if (!s.ok()) {
+    printf("Open test3 db failed, error: %s\n", s.ToString().c_str());
+    return;
+  }
+  std::vector<std::thread> test3_jobs;
+  auto test3_start = system_clock::now();
+  for (size_t i = 0; i < THREADNUM_SIX; ++i) {
+    test3_jobs.emplace_back([&test3_db](std::vector<blackwidow::ScoreMember> sms) {
+      size_t idx;
+      int32_t ret = 0;
+      std::vector<blackwidow::ScoreMember> sub_sms;
+      for (idx = 0; idx + BATCH_LIMIT_ONE_THOUSAND < sms.size(); idx += BATCH_LIMIT_ONE_THOUSAND) {
+        for (size_t offset = 0; offset < BATCH_LIMIT_ONE_THOUSAND; ++offset) {
+          sub_sms.push_back(sms[idx + offset]);
+        }
+        test3_db.ZAdd("ZADD_KEY_3", sub_sms, &ret);
+        sub_sms.clear();
+      }
+
+      if (idx < sms.size()) {
+        for (size_t sidx = idx; sidx < sms.size(); ++sidx) {
+          sub_sms.push_back(sms[sidx]);
+        }
+        test3_db.ZAdd("ZADD_KEY_3", sub_sms, &ret);
+      }
+    }, sms);
+  }
+  for (auto& job : test3_jobs) {
+    job.join();
+  }
+
+  auto test3_end = system_clock::now();
+  duration<double> test3_elapsed_seconds = test3_end - test3_start;
+  auto test3_cost = duration_cast<std::chrono::milliseconds>(test3_elapsed_seconds).count();
+  std::cout << "Test case 3, MultiThread ZAdd " << THREADNUM_SIX * sms.size() << " Score Member Cost: " << test3_cost << "ms" << std::endl;
+}
+
 static void usage() {
   std::cout << "Usage: " << std::endl;
   std::cout << "      ./benchmark_bw [Set|MultiThreadSet|Scan|Keys|HSet|HMSet|HDel|HKeys|HGetall|SAdd|SRem|SMove|SMembers|LRange]\n";
@@ -1030,6 +1168,8 @@ int main(int argc, char *argv[]) {
     BenchSMembers();
   } else if (interface == "LRange") {
     BenchLRange();
+  } else if (interface == "ZAdd") {
+    BenchZAdd();
   } else {
    usage();
   }
