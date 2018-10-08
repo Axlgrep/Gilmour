@@ -19,3 +19,6 @@
 [submodule "benchmark/blackwidow_benchmark/deps/slash"]
 	path = benchmark/blackwidow_benchmark/deps/slash
 	url = https://github.com/Qihoo360/slash.git
+[submodule "third/rocksdb"]
+	path = third/rocksdb
+	url = https://github.com/Axlgrep/rocksdb.git
