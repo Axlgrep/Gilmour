@@ -30,7 +30,7 @@ all: $(TARGET)
 # E, 一个未解析的符号集合U,以及一个在前面
 # 输入文件中已经定义的符号集合D...
 $(TARGET): $(LEVELDB) $(OBJS)
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $(OBJS) $(INCLUDE_PATH) $(LIB_PATH) $(LIBS)
+	$(CXX) $(CXXFLAGS) -o $@ $(OBJS) $(INCLUDE_PATH) $(LIB_PATH) $(LIBS) $(LDFLAGS) 
 
 $(LEVELDB):
 	make -C $(LEVELDB_PATH)

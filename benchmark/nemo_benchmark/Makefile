@@ -1,5 +1,5 @@
 CXX=g++
-LDFLAGS=-lpthread -lrt -lsnappy -lbz2 -lz
+LDFLAGS=-lpthread -lrt -lsnappy -lbz2 -lz -llz4
 CXXFLAGS=-std=c++11
 
 DEPS_PATH=./deps
@@ -48,7 +48,7 @@ $(ROCKSDB):
 	make -C $(ROCKSDB_PATH) static_lib -j 24
 
 benchmark: benchmark.cc
-	$(CXX) $(CXXFLAGS) $^ -o $@ $(INCLUDE_PATH) $(LIB_PATH) $(LDFLAGS) $(LIBS)
+	$(CXX) $(CXXFLAGS) $^ -o $@ $(INCLUDE_PATH) $(LIB_PATH) $(LIBS) $(LDFLAGS)
 
 clean:
 	rm -rf db

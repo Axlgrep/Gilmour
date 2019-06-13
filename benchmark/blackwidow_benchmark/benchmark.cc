@@ -91,9 +91,10 @@ void GenerateRandomString(const std::string& prefix,
 void BenchSet() {
   printf("====== Set ======\n");
   blackwidow::Options options;
-  options.create_if_missing = true;
+  blackwidow::BlackwidowOptions bw_options;
+  bw_options.options.create_if_missing = true;
   blackwidow::BlackWidow db;
-  blackwidow::Status s = db.Open(options, "./db");
+  blackwidow::Status s = db.Open(bw_options, "./db");
 
   if (!s.ok()) {
     printf("Open db failed, error: %s\n", s.ToString().c_str());
@@ -139,10 +140,10 @@ void BenchSet() {
 // 该场景Blackwidow的优势更加明显.
 void BenchMultiThreadSet() {
   printf("====== Multi Thread Set ======\n");
-  blackwidow::Options options;
-  options.create_if_missing = true;
+  blackwidow::BlackwidowOptions bw_options;
+  bw_options.options.create_if_missing = true;
   blackwidow::BlackWidow db;
-  blackwidow::Status s = db.Open(options, "./db");
+  blackwidow::Status s = db.Open(bw_options, "./db");
 
   if (!s.ok()) {
     printf("Open db failed, error: %s\n", s.ToString().c_str());
@@ -196,10 +197,10 @@ void BenchMultiThreadSet() {
 // 如果DB中数据量非常大的情况下, Blackwidow的优势会更加明显.
 void BenchScan() {
   printf("====== Scan ======\n");
-  blackwidow::Options options;
-  options.create_if_missing = true;
+  blackwidow::BlackwidowOptions bw_options;
+  bw_options.options.create_if_missing = true;
   blackwidow::BlackWidow db;
-  blackwidow::Status s = db.Open(options, "./db");
+  blackwidow::Status s = db.Open(bw_options, "./db");
 
   if (!s.ok()) {
     printf("Open db failed, error: %s\n", s.ToString().c_str());
@@ -258,10 +259,10 @@ void BenchScan() {
 // 如果DB中数据量非常大的情况下, Blackwidow的优势会更加明显.
 void BenchKeys() {
   printf("====== Keys * ======\n");
-  blackwidow::Options options;
-  options.create_if_missing = true;
+  blackwidow::BlackwidowOptions bw_options;
+  bw_options.options.create_if_missing = true;
   blackwidow::BlackWidow db;
-  blackwidow::Status s = db.Open(options, "./db");
+  blackwidow::Status s = db.Open(bw_options, "./db");
 
   if (!s.ok()) {
     printf("Open db failed, error: %s\n", s.ToString().c_str());
@@ -328,10 +329,10 @@ void BenchKeys() {
 // 造成性能开销.
 void BenchHSet() {
   printf("====== HSet ======\n");
-  blackwidow::Options options;
-  options.create_if_missing = true;
+  blackwidow::BlackwidowOptions bw_options;
+  bw_options.options.create_if_missing = true;
   blackwidow::BlackWidow db;
-  blackwidow::Status s = db.Open(options, "./db");
+  blackwidow::Status s = db.Open(bw_options, "./db");
 
   if (!s.ok()) {
     printf("Open db failed, error: %s\n", s.ToString().c_str());
@@ -383,10 +384,10 @@ void BenchHSet() {
 // 了整个HMSet操作的原子性, 速度对比与Nemo也有很大的提升.
 void BenchHMSet() {
   printf("====== HMSet ======\n");
-  blackwidow::Options options;
-  options.create_if_missing = true;
+  blackwidow::BlackwidowOptions bw_options;
+  bw_options.options.create_if_missing = true;
   blackwidow::BlackWidow db;
-  blackwidow::Status s = db.Open(options, "./db");
+  blackwidow::Status s = db.Open(bw_options, "./db");
 
   if (!s.ok()) {
     printf("Open db failed, error: %s\n", s.ToString().c_str());
@@ -444,10 +445,10 @@ void BenchHMSet() {
 // 景下Blackwidow相对于Nemo的优势将更加的明显
 void BenchHDel() {
   printf("====== HDel ======\n");
-  blackwidow::Options options;
-  options.create_if_missing = true;
+  blackwidow::BlackwidowOptions bw_options;
+  bw_options.options.create_if_missing = true;
   blackwidow::BlackWidow db;
-  blackwidow::Status s = db.Open(options, "./db");
+  blackwidow::Status s = db.Open(bw_options, "./db");
 
   if (!s.ok()) {
     printf("Open db failed, error: %s\n", s.ToString().c_str());
@@ -495,10 +496,10 @@ void BenchHDel() {
 // 存在没必要的内存分配已经数据重新拷贝.
 void BenchHKeys() {
   printf("====== HKeys ======\n");
-  blackwidow::Options options;
-  options.create_if_missing = true;
+  blackwidow::BlackwidowOptions bw_options;
+  bw_options.options.create_if_missing = true;
   blackwidow::BlackWidow db;
-  blackwidow::Status s = db.Open(options, "./db");
+  blackwidow::Status s = db.Open(bw_options, "./db");
 
   if (!s.ok()) {
     printf("Open db failed, error: %s\n", s.ToString().c_str());
@@ -559,10 +560,10 @@ void BenchHKeys() {
 // 的数据, 这个操作是很慢的.
 void BenchHGetall() {
   printf("====== HGetall ======\n");
-  blackwidow::Options options;
-  options.create_if_missing = true;
+  blackwidow::BlackwidowOptions bw_options;
+  bw_options.options.create_if_missing = true;
   blackwidow::BlackWidow db;
-  blackwidow::Status s = db.Open(options, "./db");
+  blackwidow::Status s = db.Open(bw_options, "./db");
 
   if (!s.ok()) {
     printf("Open db failed, error: %s\n", s.ToString().c_str());
@@ -646,10 +647,10 @@ void BenchHGetall() {
 //
 void BenchSAdd() {
   printf("====== SAdd ======\n");
-  blackwidow::Options options;
-  options.create_if_missing = true;
+  blackwidow::BlackwidowOptions bw_options;
+  bw_options.options.create_if_missing = true;
   blackwidow::BlackWidow db;
-  blackwidow::Status s = db.Open(options, "./db");
+  blackwidow::Status s = db.Open(bw_options, "./db");
 
   if (!s.ok()) {
     printf("Open db failed, error: %s\n", s.ToString().c_str());
@@ -705,10 +706,10 @@ void BenchSAdd() {
 // 明显优于Nemo.
 void BenchSRem() {
   printf("====== SRem ======\n");
-  blackwidow::Options options;
-  options.create_if_missing = true;
+  blackwidow::BlackwidowOptions bw_options;
+  bw_options.options.create_if_missing = true;
   blackwidow::BlackWidow db;
-  blackwidow::Status s = db.Open(options, "./db");
+  blackwidow::Status s = db.Open(bw_options, "./db");
 
   if (!s.ok()) {
     printf("Open db failed, error: %s\n", s.ToString().c_str());
@@ -771,10 +772,10 @@ void BenchSRem() {
 // 内容的指针, 而不是重新构造这个String对象, 所以性能明显提升.
 void BenchSMove() {
   printf("====== SMove ======\n");
-  blackwidow::Options options;
-  options.create_if_missing = true;
+  blackwidow::BlackwidowOptions bw_options;
+  bw_options.options.create_if_missing = true;
   blackwidow::BlackWidow db;
-  blackwidow::Status s = db.Open(options, "./db");
+  blackwidow::Status s = db.Open(bw_options, "./db");
 
   if (!s.ok()) {
     printf("Open db failed, error: %s\n", s.ToString().c_str());
@@ -828,10 +829,10 @@ void BenchSMove() {
 
 void BenchSPop() {
   printf("====== SPop ======\n");
-  blackwidow::Options options;
-  options.create_if_missing = true;
+  blackwidow::BlackwidowOptions bw_options;
+  bw_options.options.create_if_missing = true;
   blackwidow::BlackWidow db;
-  blackwidow::Status s = db.Open(options, "./db");
+  blackwidow::Status s = db.Open(bw_options, "./db");
 
   if (!s.ok()) {
     printf("Open db failed, error: %s\n", s.ToString().c_str());
@@ -886,10 +887,10 @@ void BenchSPop() {
 // 的数据, 这个操作是很慢的.
 void BenchSMembers() {
   printf("====== SMembers ======\n");
-  blackwidow::Options options;
-  options.create_if_missing = true;
+  blackwidow::BlackwidowOptions bw_options;
+  bw_options.options.create_if_missing = true;
   blackwidow::BlackWidow db;
-  blackwidow::Status s = db.Open(options, "./db");
+  blackwidow::Status s = db.Open(bw_options, "./db");
 
   if (!s.ok()) {
     printf("Open db failed, error: %s\n", s.ToString().c_str());
@@ -938,10 +939,10 @@ void BenchSMembers() {
 
 void BenchLRange() {
   printf("====== LRange ======\n");
-  blackwidow::Options options;
-  options.create_if_missing = true;
+  blackwidow::BlackwidowOptions bw_options;
+  bw_options.options.create_if_missing = true;
   blackwidow::BlackWidow db;
-  blackwidow::Status s = db.Open(options, "./db");
+  blackwidow::Status s = db.Open(bw_options, "./db");
 
   if (!s.ok()) {
     printf("Open db failed, error: %s\n", s.ToString().c_str());
@@ -996,8 +997,8 @@ void BenchLRange() {
 
 void BenchZAdd() {
   printf("====== ZAdd ======\n");
-  blackwidow::Options options;
-  options.create_if_missing = true;
+  blackwidow::BlackwidowOptions bw_options;
+  bw_options.options.create_if_missing = true;
   rocksdb::Status s;
 
   blackwidow::ScoreMember sm;
@@ -1010,7 +1011,7 @@ void BenchZAdd() {
 
   // Test Case 1, Don't do batch
   blackwidow::BlackWidow test1_db;
-  s = test1_db.Open(options, "./db_zadd_test1");
+  s = test1_db.Open(bw_options, "./db_zadd_test1");
   if (!s.ok()) {
     printf("Open test1 db failed, error: %s\n", s.ToString().c_str());
     return;
@@ -1050,7 +1051,7 @@ void BenchZAdd() {
 
   // Test Case 2, Make batch in groups of ten
   blackwidow::BlackWidow test2_db;
-  s = test2_db.Open(options, "./db_zadd_test2");
+  s = test2_db.Open(bw_options, "./db_zadd_test2");
   if (!s.ok()) {
     printf("Open test2 db failed, error: %s\n", s.ToString().c_str());
     return;
@@ -1090,7 +1091,7 @@ void BenchZAdd() {
 
   // Test Case 3, Make batch in groups of one hundred
   blackwidow::BlackWidow test3_db;
-  test3_db.Open(options, "./db_zadd_test3");
+  test3_db.Open(bw_options, "./db_zadd_test3");
   if (!s.ok()) {
     printf("Open test3 db failed, error: %s\n", s.ToString().c_str());
     return;

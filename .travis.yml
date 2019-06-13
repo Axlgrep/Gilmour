@@ -1,0 +1,22 @@
+sudo: required
+dist: trusty
+language: cpp
+
+os:
+  - linux
+
+addons:
+  apt:
+    packages: ['libsnappy-dev', 'liblz4-dev']
+
+compiler:
+  - gcc
+
+language: cpp
+
+script:
+  - git submodule init
+  - git submodule update
+  - make -C ./benchmark/blackwidow_benchmark
+  - make -C ./benchmark/nemo_benchmark
+  - make
