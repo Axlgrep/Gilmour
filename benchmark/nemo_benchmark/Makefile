@@ -1,5 +1,5 @@
 CXX=g++
-LDFLAGS=-lpthread -lrt -lsnappy -lbz2 -lz -llz4
+LDFLAGS=-lpthread -lrt -lsnappy -lbz2 -lz
 CXXFLAGS=-std=c++11
 
 DEPS_PATH=./deps

@@ -177,6 +177,40 @@ void BenchMultiThreadSet() {
     << cost << "s QPS: " << (THREADNUM * kvs.size()) / cost << std::endl;
 }
 
+void BenchMSet() {
+  printf("====== MSet ======\n");
+  blackwidow::Options options;
+  blackwidow::BlackwidowOptions bw_options;
+  bw_options.options.create_if_missing = true;
+  blackwidow::BlackWidow db;
+  blackwidow::Status s = db.Open(bw_options, "./db");
+
+  if (!s.ok()) {
+    printf("Open db failed, error: %s\n", s.ToString().c_str());
+    return;
+  }
+
+  blackwidow::KeyValue kv;
+  std::vector<blackwidow::KeyValue> kvs;
+  for (int i = 0; i < 10; i++) {
+    GenerateRandomString("key_", 64, &kv.key);
+    GenerateRandomString("value_", 64, &kv.value);
+    kvs.push_back(kv);
+  }
+
+  auto start = system_clock::now();
+  for (int i = 0; i < 1000000; i++) {
+    db.MSet(kvs);
+  }
+  auto end = system_clock::now();
+
+  duration<double> elapsed_seconds = end - start;
+  auto cost = duration_cast<std::chrono::seconds>(elapsed_seconds).count();
+  std::cout << "Test MSet " << kvs.size() << " KV Cost: " << cost << "s QPS: "
+    << 1000000 / cost << std::endl;
+}
+
+
 // Blackwidow : Test Scan 10000 Keys Cost: 27ms
 // Nemo       : Test Scan 10000 Keys Cost: 84ms
 // 测试场景 : 先向引擎中写入10000个大小为10000的Hash Table, 然后Scan
@@ -1145,6 +1179,8 @@ int main(int argc, char *argv[]) {
     BenchSet();
   } else if (interface == "MultiThreadSet") {
     BenchMultiThreadSet();
+  } else if (interface == "MSet") {
+    BenchMSet();
   } else if (interface == "Scan") {
     BenchScan();
   } else if (interface == "Keys") {

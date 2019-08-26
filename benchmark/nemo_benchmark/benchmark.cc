@@ -131,6 +131,38 @@ void BenchMultiThreadSet() {
   delete db;
 }
 
+void BenchMSet() {
+  printf("====== MSet ======\n");
+  nemo::Options options;
+  options.create_if_missing = true;
+  nemo::Nemo* db = new nemo::Nemo("./db", options);
+
+  if (!db) {
+    printf("Open db failed\n");
+    return;
+  }
+
+  nemo::KV kv;
+  std::vector<nemo::KV> kvs;
+  for (int i = 0; i < 10; i++) {
+    GenerateRandomString("key_", 64, &kv.key);
+    GenerateRandomString("value_", 64, &kv.val);
+    kvs.push_back(kv);
+  }
+
+  auto start = system_clock::now();
+  for (int i = 0; i < 1000000; i++) {
+    db->MSet(kvs);
+  }
+  auto end = system_clock::now();
+
+  duration<double> elapsed_seconds = end - start;
+  auto cost = duration_cast<std::chrono::seconds>(elapsed_seconds).count();
+  std::cout << "Test MSet " << kvs.size() << " KV Cost: " << cost << "s QPS: "
+    << 1000000 / cost << std::endl;
+  delete db;
+}
+
 void BenchScan() {
   printf("====== Scan ======\n");
   nemo::Options options;
@@ -880,6 +912,8 @@ int main(int argc, char *argv[]) {
     BenchSet();
   } else if (interface == "MultiThreadSet") {
     BenchMultiThreadSet();
+  } else if (interface == "MSet") {
+    BenchMSet();
   } else if (interface == "Scan") {
     BenchScan();
   } else if (interface == "Keys") {
